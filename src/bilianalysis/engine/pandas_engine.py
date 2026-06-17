@@ -224,7 +224,7 @@ class PandasEngine(AnalysisEngine):
     def _fill_missing(self, dfs: dict[str, pd.DataFrame]) -> dict[str, pd.DataFrame]:
         """缺失值填充：数值列 → 0，文本列 → ""，时间列 → NaT。"""
         numeric_cols = {
-            "Weekly": [], "Video": ["aid", "duration", "cid", "pubdate"],
+            "Weekly": ["start_time", "end_time"], "Video": ["aid", "duration", "cid", "pubdate"],
             "Creator": ["mid"], "Category": ["tid", "tid_v2"],
             "VideoStat": ["aid", "view", "like", "coin", "favorite", "share", "reply", "danmaku"],
         }
@@ -309,12 +309,18 @@ class PandasEngine(AnalysisEngine):
         df["tname"] = category["tname"].values
 
         # 4. 匹配每期视频所属周次（pubdate ∈ [start_time, end_time]）
-        #    使用 cross join + 过滤实现向量化匹配
-        df = df.assign(_key=1).merge(weekly.assign(_key=1), on="_key").drop(columns="_key")
-        df = df[(df["start_time"] <= df["pubdate"]) & (df["pubdate"] <= df["end_time"])]
-        week_number_map = df[["number"]].rename(columns={"number": "week_number"})
-        # 将 week_number 关联回原 df（按索引）
-        df["week_number"] = week_number_map["week_number"].values
+        week_map = []
+        for _, row in df.iterrows():
+            pd_date = row["pubdate"]
+            matched = None
+            for _, wrow in weekly.iterrows():
+                st = wrow.get("start_time", 0) or 0
+                et = wrow.get("end_time", 0) or 0
+                if st <= pd_date <= et:
+                    matched = wrow["number"]
+                    break
+            week_map.append(matched if matched is not None else 1)
+        df["week_number"] = week_map
 
         # 5. 计算交互率（view=0 替换为 1 避免除零）
         view_safe = df["view"].replace(0, 1.0)
@@ -410,6 +416,15 @@ class PandasEngine(AnalysisEngine):
         features = ["view", "like", "coin", "favorite"]
         X = stat[features].copy()
 
+        # 样本不足以聚类时返回空报告
+        if len(X) < 3:
+            duration = time.monotonic() - start_time
+            return ClusterReport(
+                clusters=ClusterResult(k=3, clusters=[], silhouette_score=0.0, feature_importance={}),
+                scatter_data={"labels": [], "x": [], "y": []},
+                duration_seconds=round(duration, 2),
+            )
+
         # 标准化
         scaler = StandardScaler()
         X_scaled = scaler.fit_transform(X)
@@ -492,10 +507,18 @@ class PandasEngine(AnalysisEngine):
         merged = video.merge(stat, on="aid", how="inner")
 
         # 2. 匹配每期视频所属周次（pubdate ∈ [start_time, end_time]）
-        #    使用 cross join + 过滤实现向量化匹配（与 statistics() 相同）
-        merged = merged.assign(_key=1).merge(weekly.assign(_key=1), on="_key").drop(columns="_key")
-        merged = merged[(merged["start_time"] <= merged["pubdate"]) & (merged["pubdate"] <= merged["end_time"])]
-        merged["week_number"] = merged["number"]
+        week_map = []
+        for _, row in merged.iterrows():
+            pd_date = row["pubdate"]
+            matched = None
+            for _, wrow in weekly.iterrows():
+                st = wrow.get("start_time", 0) or 0
+                et = wrow.get("end_time", 0) or 0
+                if st <= pd_date <= et:
+                    matched = wrow["number"]
+                    break
+            week_map.append(matched if matched is not None else 1)
+        merged["week_number"] = week_map
 
         # 3. Aggregate by week
         weekly_agg = merged.groupby("week_number").agg(
