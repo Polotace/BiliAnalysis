@@ -8,21 +8,14 @@ from typing import Literal
 from pydantic import BaseModel
 import aiohttp
 
-from bilianalysis.crawler.api import list_series, get_weekly_videos
-from bilianalysis.crawler.storage import save_week, load_progress, save_progress, get_pending_weeks
+from bilianalysis.config import CrawlerSection, load_config
+from .api import list_series, get_weekly_videos
+from .storage import save_week, load_progress, save_progress, get_pending_weeks
 from bilianalysis.utils.fetch import create_session, HttpError
 
 def _jitter(base: float) -> float:
     """在基础延迟上叠加 ±1 秒随机抖动，避免请求间隔过于规律被反爬。"""
     return base + random.uniform(-1, 1)
-
-
-class CrawlConfig(BaseModel):
-    mode: Literal["sequential", "concurrent"] = "sequential"
-    concurrency: int = 3
-    request_delay: float = 2.5
-    max_retries: int = 3
-    retry_delay: float = 1.0
 
 
 class CrawlReport(BaseModel):
@@ -34,8 +27,10 @@ class CrawlReport(BaseModel):
     duration_seconds: float
 
 
-async def run(config: CrawlConfig = CrawlConfig()) -> CrawlReport:
+async def run(config: CrawlerSection | None = None) -> CrawlReport:
     """执行一次完整爬取。供外部模块调用。"""
+    if config is None:
+        config = load_config().crawler
     start_time = time.monotonic()
     crawled_count = 0
     failed_count = 0
@@ -127,7 +122,7 @@ async def run(config: CrawlConfig = CrawlConfig()) -> CrawlReport:
 
 
 async def _crawl_one(session: aiohttp.ClientSession, number: int,
-                     config: CrawlConfig) -> tuple[bool, str]:
+                     config: CrawlerSection) -> tuple[bool, str]:
     """爬取单期，含重试逻辑。返回 (成功, 错误信息)。"""
     last_error = ""
     for attempt in range(1, config.max_retries + 1):

@@ -1,7 +1,9 @@
 """异步 HTTP 工具模块。函数式设计，Session 由调用方显式管理。"""
 from typing import Any
 import aiohttp
-from bilianalysis.utils.ua import ua
+from .ua import ua
+
+__all__ = ["HttpError", "create_session", "get", "post"]
 
 DEFAULT_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=3)
 

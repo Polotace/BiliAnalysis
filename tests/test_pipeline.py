@@ -1,6 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
-from bilianalysis.crawler import CrawlConfig, CrawlReport, CrawlRunner as run
+from bilianalysis.crawler import CrawlReport, CrawlRunner as run
+from bilianalysis.config import CrawlerSection
 from bilianalysis.crawler import ProgressFile
 from bilianalysis.utils.fetch import HttpError
 
@@ -17,9 +18,9 @@ WEEKLY_DATA = {
 }
 
 
-class TestCrawlConfig:
+class TestCrawlerSection:
     def test_defaults(self):
-        config = CrawlConfig()
+        config = CrawlerSection()
         assert config.mode == "sequential"
         assert config.concurrency == 3
         assert config.request_delay == 2.5
@@ -27,7 +28,7 @@ class TestCrawlConfig:
         assert config.retry_delay == 1.0
 
     def test_override(self):
-        config = CrawlConfig(mode="concurrent", concurrency=5)
+        config = CrawlerSection(mode="concurrent", concurrency=5)
         assert config.mode == "concurrent"
         assert config.concurrency == 5
 
@@ -58,7 +59,7 @@ class TestRun:
 
         with patch("bilianalysis.crawler.pipeline.list_series", mock_list_series):
             with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                config = CrawlConfig(mode="sequential", request_delay=0, retry_delay=0)
+                config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
                 report = await run(config)
 
         assert report.total == 3
@@ -79,7 +80,7 @@ class TestRun:
 
         with patch("bilianalysis.crawler.pipeline.list_series", mock_list_series):
             with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                config = CrawlConfig(mode="sequential", request_delay=0, retry_delay=0)
+                config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
                 report = await run(config)
 
         assert report.skipped == 2
@@ -100,7 +101,7 @@ class TestRun:
 
         with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
             with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                config = CrawlConfig(mode="sequential", request_delay=0, retry_delay=0)
+                config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
                 report = await run(config)
 
         assert report.crawled == 1  # only week 3
@@ -124,7 +125,7 @@ class TestRun:
 
         with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
             with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                config = CrawlConfig(mode="sequential", request_delay=0, retry_delay=0)
+                config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
                 report = await run(config)
 
         progress = await load_progress()
@@ -140,7 +141,7 @@ class TestRun:
 
         with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
             with patch("bilianalysis.crawler.pipeline.get_weekly_videos", AsyncMock(return_value=WEEKLY_DATA)):
-                config = CrawlConfig(mode="concurrent", concurrency=3, retry_delay=0)
+                config = CrawlerSection(mode="concurrent", concurrency=3, retry_delay=0)
                 report = await run(config)
 
         assert report.crawled == 3

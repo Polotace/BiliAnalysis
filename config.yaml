@@ -1,0 +1,23 @@
+# Configuration file for the project
+# You can use environment variable to assign a config.yaml file path, e.g. export BILI_CONFIG_PATH=/path/to/config.yaml
+crawler:
+  # Options: sequential, concurrent
+  mode: sequential
+  # Only used if mode is concurrent
+  # Number of concurrent requests
+  concurrency: 5
+  # Delay between requests in seconds
+  request_delay: 2.5
+  # Maximum number of retries for failed requests
+  max_retries: 3
+  # Delay between retries in seconds
+  retry_delay: 1.0
+
+analysis:
+  # Options: pandas, spark
+  engine: pandas
+
+data:
+  raw_dir: data/raw
+  processed_dir: data/processed
+  reports_dir: data/reports
