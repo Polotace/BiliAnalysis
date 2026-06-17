@@ -6,8 +6,16 @@ import time
 from pathlib import Path
 
 from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.functions import col, monotonically_increasing_id, when, lit, explode
+from pyspark.sql.functions import col, monotonically_increasing_id, when, lit, explode, avg, count, sum as spark_sum
 from pyspark.sql.types import LongType, DoubleType
+
+from pyspark.ml.feature import StandardScaler, VectorAssembler
+from pyspark.ml.clustering import KMeans as SparkKMeans
+from pyspark.ml.evaluation import ClusteringEvaluator
+from pyspark.ml.regression import LinearRegression as SparkLinearRegression
+import numpy as np
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_absolute_error
 
 from bilianalysis.config.model import DataSection
 from bilianalysis.engine.base import (
@@ -254,14 +262,238 @@ class SparkEngine(AnalysisEngine):
     # ── statistics ───────────────────────────────────────────
 
     def statistics(self) -> StatReport:
-        raise NotImplementedError("statistics: to be implemented in Task 4")
+        """从 processed/ Parquet 读取 → JOIN → groupBy 聚合 → StatReport。"""
+        # 1. 读取 5 张 Parquet
+        weekly = self._spark.read.parquet(str(self._processed_dir / "Weekly"))
+        video = self._spark.read.parquet(str(self._processed_dir / "Video"))
+        stat = self._spark.read.parquet(str(self._processed_dir / "VideoStat"))
+        creator = self._spark.read.parquet(str(self._processed_dir / "Creator"))
+        category = self._spark.read.parquet(str(self._processed_dir / "Category"))
+
+        # 2. Join: Video + VideoStat on aid; + Creator/Category on row_id
+        df = video.join(stat, "aid", "inner")
+        df = df.join(creator, "row_id", "left")
+        df = df.join(category, "row_id", "left")
+
+        # 3. 周匹配: pubdate between start_time and end_time
+        df = df.crossJoin(weekly.withColumnRenamed("start_time", "w_start")
+                           .withColumnRenamed("end_time", "w_end")
+                           .withColumnRenamed("number", "week_number"))
+        df = df.filter((col("pubdate") >= col("w_start")) & (col("pubdate") <= col("w_end")))
+
+        # 4. 交互率
+        df = df.withColumn("like_rate", col("like") / when(col("view") == 0, lit(1)).otherwise(col("view")))
+        df = df.withColumn("coin_rate", col("coin") / when(col("view") == 0, lit(1)).otherwise(col("view")))
+        df = df.withColumn("favorite_rate", col("favorite") / when(col("view") == 0, lit(1)).otherwise(col("view")))
+
+        # 5. OverallStats
+        overall_row = df.agg(
+            count("aid").alias("total_videos"),
+            count("mid").alias("total_creators"),
+            avg("view"), avg("like"), avg("coin"), avg("favorite"),
+            avg("share"), avg("danmaku"),
+            avg("like_rate"), avg("coin_rate"), avg("favorite_rate"),
+        ).collect()[0]
+        overall = OverallStats(
+            total_videos=int(overall_row["total_videos"]),
+            total_creators=int(overall_row["total_creators"]),
+            avg_view=round(float(overall_row["avg(view)"]), 2),
+            avg_like=round(float(overall_row["avg(like)"]), 2),
+            avg_coin=round(float(overall_row["avg(coin)"]), 2),
+            avg_favorite=round(float(overall_row["avg(favorite)"]), 2),
+            avg_share=round(float(overall_row["avg(share)"]), 2),
+            avg_danmaku=round(float(overall_row["avg(danmaku)"]), 2),
+            avg_like_rate=round(float(overall_row["avg(like_rate)"]), 4),
+            avg_coin_rate=round(float(overall_row["avg(coin_rate)"]), 4),
+            avg_favorite_rate=round(float(overall_row["avg(favorite_rate)"]), 4),
+        )
+
+        # 6. by_category
+        cat_rows = df.groupBy("tname").agg(
+            count("aid").alias("video_count"),
+            avg("view"), avg("like"), avg("like_rate").alias("avg_interaction_rate"),
+        ).collect()
+        by_category = [CategoryStats(
+            tname=r["tname"], video_count=int(r["video_count"]),
+            avg_view=round(float(r["avg(view)"]), 2),
+            avg_like=round(float(r["avg(like)"]), 2),
+            avg_interaction_rate=round(float(r["avg(like_rate)"]), 4),
+        ) for r in cat_rows]
+
+        # 7. by_creator (TOP10)
+        creator_rows = df.groupBy("mid", "name").agg(
+            count("aid").alias("appearance_count"),
+            spark_sum("view").alias("total_view"),
+            spark_sum("like").alias("total_like"),
+            spark_sum("favorite").alias("total_favorite"),
+        ).orderBy(col("appearance_count").desc()).limit(10).collect()
+        by_creator = [CreatorStats(
+            mid=int(r["mid"]), name=r["name"],
+            appearance_count=int(r["appearance_count"]),
+            total_view=int(r["total_view"]),
+            total_like=int(r["total_like"]),
+            total_favorite=int(r["total_favorite"]),
+        ) for r in creator_rows]
+
+        # 8. by_week
+        week_rows = df.groupBy("week_number").agg(
+            count("aid").alias("video_count"),
+            avg("view"), avg("like"), avg("like_rate").alias("avg_interaction_rate"),
+        ).orderBy("week_number").collect()
+        by_week = [WeeklyTrend(
+            week_number=int(r["week_number"]),
+            video_count=int(r["video_count"]),
+            avg_view=round(float(r["avg(view)"]), 2),
+            avg_like=round(float(r["avg(like)"]), 2),
+            avg_interaction_rate=round(float(r["avg(like_rate)"]), 4),
+        ) for r in week_rows]
+
+        return StatReport(overall=overall, by_category=by_category, by_creator=by_creator, by_week=by_week)
 
     # ── clustering ───────────────────────────────────────────
 
     def clustering(self) -> ClusterReport:
-        raise NotImplementedError("clustering: to be implemented in Task 5")
+        """从 processed/ Stat 读取 → KMeans(k=3) → ClusterReport（scatter_data 留空）。"""
+        start_time = time.monotonic()
+        stat = self._spark.read.parquet(str(self._processed_dir / "VideoStat"))
+
+        total = stat.count()
+        if total < 3:
+            duration = time.monotonic() - start_time
+            return ClusterReport(
+                clusters=ClusterResult(k=3, clusters=[], silhouette_score=0.0, feature_importance={}),
+                scatter_data={"labels": [], "x": [], "y": []},
+                duration_seconds=round(duration, 2),
+            )
+
+        features = ["view", "like", "coin", "favorite"]
+        assembler = VectorAssembler(inputCols=features, outputCol="features")
+        assembled = assembler.transform(stat)
+
+        scaler = StandardScaler(inputCol="features", outputCol="scaled_features",
+                                withStd=True, withMean=True)
+        scaler_model = scaler.fit(assembled)
+        scaled = scaler_model.transform(assembled)
+
+        kmeans = SparkKMeans(k=3, seed=42, featuresCol="scaled_features", predictionCol="label")
+        model = kmeans.fit(scaled)
+        predictions = model.transform(scaled)
+
+        evaluator = ClusteringEvaluator(featuresCol="scaled_features", metricName="silhouette")
+        sil_score = evaluator.evaluate(predictions)
+
+        # 聚类中心
+        centers = model.clusterCenters()
+        import pandas as pd
+        centers_df = pd.DataFrame([c.tolist() for c in centers], columns=features)
+        importance = {f: round(float(centers_df[f].var()), 4) for f in features}
+
+        # 聚合每个 cluster (toPandas for per-cluster stats)
+        stat_pd = stat.toPandas()
+        labels_pd = predictions.select("aid", "label").toPandas()
+        merged = stat_pd.merge(labels_pd, on="aid")
+        merged["interaction_rate"] = (merged["like"] + merged["coin"] + merged["favorite"]) / merged["view"].replace(0, 1)
+
+        label_view_rank = {}
+        for label_idx in range(3):
+            mask = merged["label"] == label_idx
+            label_view_rank[label_idx] = float(merged.loc[mask, "view"].mean()) if mask.any() else 0.0
+
+        sorted_labels = sorted(label_view_rank, key=label_view_rank.get, reverse=True)
+        tag_map = {sorted_labels[0]: "爆款视频", sorted_labels[1]: "普通热门", sorted_labels[2]: "潜力视频"}
+
+        clusters = []
+        for label_idx in range(3):
+            mask = merged["label"] == label_idx
+            cluster_data = merged[mask]
+            centroid = {f: round(float(cluster_data[f].mean()), 2) for f in features}
+            sample_ids = cluster_data["aid"].head(20).astype(int).tolist()
+            clusters.append(ClusterGroup(
+                label=label_idx, tag=tag_map[label_idx], count=int(mask.sum()),
+                centroid=centroid,
+                avg_view=round(float(cluster_data["view"].mean()), 2),
+                avg_like=round(float(cluster_data["like"].mean()), 2),
+                avg_coin=round(float(cluster_data["coin"].mean()), 2),
+                avg_favorite=round(float(cluster_data["favorite"].mean()), 2),
+                sample_ids=sample_ids,
+            ))
+
+        duration = time.monotonic() - start_time
+        return ClusterReport(
+            clusters=ClusterResult(k=3, clusters=clusters,
+                                   silhouette_score=round(float(sil_score), 4),
+                                   feature_importance=importance),
+            scatter_data={"labels": [], "x": [], "y": []},
+            duration_seconds=round(duration, 2),
+        )
 
     # ── prediction ───────────────────────────────────────────
 
     def prediction(self) -> PredictionReport:
-        raise NotImplementedError("prediction: to be implemented in Task 5")
+        """从 processed/ Parquet → 周聚合 → LinearRegression → PredictionReport。"""
+        start_time = time.monotonic()
+        video = self._spark.read.parquet(str(self._processed_dir / "Video"))
+        stat = self._spark.read.parquet(str(self._processed_dir / "VideoStat"))
+        weekly = self._spark.read.parquet(str(self._processed_dir / "Weekly"))
+
+        merged = video.join(stat, "aid", "inner")
+        merged = merged.crossJoin(weekly.withColumnRenamed("start_time", "w_start")
+                                   .withColumnRenamed("end_time", "w_end")
+                                   .withColumnRenamed("number", "week_number"))
+        merged = merged.filter((col("pubdate") >= col("w_start")) & (col("pubdate") <= col("w_end")))
+
+        weekly_agg = merged.groupBy("week_number").agg(
+            avg("view").alias("avg_view"), avg("like").alias("avg_like"),
+            avg("coin").alias("avg_coin"), avg("favorite").alias("avg_favorite"),
+            count("aid").alias("video_count"),
+        ).orderBy("week_number")
+
+        df = weekly_agg.toPandas()
+
+        def _predict(target: str) -> PredictionResult:
+            if len(df) < 3:
+                return PredictionResult(
+                    model_type="linear_regression", target=target, r2_score=0.0, mae=0.0,
+                    coefficients={}, intercept=0.0, fitted=[], forecast=[],
+                )
+            feature_cols = ["week_number", "video_count"]
+            X = df[feature_cols].values
+            y = df[f"avg_{target}"].values
+
+            model = LinearRegression()
+            model.fit(X, y)
+            y_pred = model.predict(X)
+
+            r2 = r2_score(y, y_pred)
+            mae = mean_absolute_error(y, y_pred)
+            coef = {feature_cols[i]: round(float(model.coef_[i]), 4) for i in range(len(feature_cols))}
+            intercept = round(float(model.intercept_), 2)
+
+            fitted = [
+                {"week_number": int(df.iloc[i]["week_number"]),
+                 "actual": round(float(y[i]), 2),
+                 "predicted": round(float(y_pred[i]), 2)}
+                for i in range(len(df))
+            ]
+            last_week = int(df["week_number"].max())
+            avg_vc = int(df["video_count"].mean())
+            future_X = np.array([[last_week + i, avg_vc] for i in range(1, 5)])
+            future_pred = model.predict(future_X)
+            forecast = [
+                {"week_number": int(last_week + i), "predicted": round(float(future_pred[j]), 2)}
+                for j, i in enumerate(range(1, 5))
+            ]
+            return PredictionResult(
+                model_type="linear_regression", target=target,
+                r2_score=round(float(r2), 4), mae=round(float(mae), 2),
+                coefficients=coef, intercept=intercept,
+                fitted=fitted, forecast=forecast,
+            )
+
+        view_result = _predict("view")
+        like_result = _predict("like")
+        duration = time.monotonic() - start_time
+        return PredictionReport(
+            view_predict=view_result, like_predict=like_result,
+            duration_seconds=round(duration, 2),
+        )
