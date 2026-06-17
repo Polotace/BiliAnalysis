@@ -5,8 +5,7 @@ from pathlib import Path
 from datetime import datetime
 
 import pandas as pd
-import pyarrow as pa
-import pyarrow.parquet as pq
+
 
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_absolute_error, silhouette_score
@@ -26,12 +25,11 @@ from bilianalysis.engine.base import (
 class PandasEngine(AnalysisEngine):
     """基于 Pandas 的分析引擎。
 
-    分批加载 raw JSON，清洗后写出 5 张 Parquet 表，
+    全量加载 raw JSON，清洗后写出 5 张 Parquet 表，
     支持统计分析、KMeans 聚类、线性回归预测。
     """
 
-    def __init__(self, data_config: DataSection, batch_size: int = 10):
-        self._batch_size = batch_size
+    def __init__(self, data_config: DataSection):
         self._raw_dir = Path(data_config.raw_dir)
         self._processed_dir = Path(data_config.processed_dir)
         self._reports_dir = Path(data_config.reports_dir)
@@ -41,116 +39,73 @@ class PandasEngine(AnalysisEngine):
     async def clean_data(self) -> CleanReport:
         start_time = time.monotonic()
 
+        # 1. 全量加载所有 week JSON
         files = sorted(self._raw_dir.glob("week_*.json"),
                        key=lambda p: int(p.stem.split("_")[1]))
+        records = []
+        for fp in files:
+            with open(fp, encoding="utf-8") as fh:
+                records.append(json.load(fh))
 
-        total_weeks = len(files)
-        total_videos = 0
-        duplicates_dropped = 0
-        missing_filled = 0
+        # 2. 拆表
+        dfs = self._extract_tables(records)
+
+        # 3. 缺失值
+        na_before = sum(df.isna().sum().sum() for df in dfs.values())
+        dfs = self._fill_missing(dfs)
+        missing_filled = na_before
+
+        # 4. 去重（按 aid，保留首次出现）
+        video_df = dfs["Video"]
+        before = len(video_df)
+        if not video_df.empty:
+            keep_mask = ~video_df["aid"].duplicated(keep="first")
+            video_df = video_df[keep_mask].reset_index(drop=True)
+            duplicates_dropped = before - len(video_df)
+            dfs["Video"] = video_df
+            # 同步关联表
+            dfs["VideoStat"] = dfs["VideoStat"].loc[keep_mask.values].reset_index(drop=True) if not dfs["VideoStat"].empty else dfs["VideoStat"]
+            dfs["Creator"] = dfs["Creator"].loc[keep_mask.values].reset_index(drop=True) if not dfs["Creator"].empty else dfs["Creator"]
+            dfs["Category"] = dfs["Category"].loc[keep_mask.values].reset_index(drop=True) if not dfs["Category"].empty else dfs["Category"]
+        else:
+            duplicates_dropped = 0
+
+        # 5. 类型转换
+        dfs = self._convert_types(dfs)
+
+        # 6. 异常值检测
+        stat_df = dfs["VideoStat"]
         outliers_flagged = 0
-        seen_aids: set[int] = set()
+        if not stat_df.empty:
+            stat_before = len(stat_df)
+            valid = (
+                (stat_df["view"] >= 0) & (stat_df["like"] >= 0) &
+                (stat_df["coin"] >= 0) & (stat_df["favorite"] >= 0) &
+                (stat_df["share"] >= 0) & (stat_df["reply"] >= 0) &
+                (stat_df["danmaku"] >= 0)
+            )
+            dfs["VideoStat"] = stat_df[valid].reset_index(drop=True)
+            if not valid.all():
+                dfs["Video"] = dfs["Video"].loc[valid.values].reset_index(drop=True)
+                dfs["Creator"] = dfs["Creator"].loc[valid.values].reset_index(drop=True)
+                dfs["Category"] = dfs["Category"].loc[valid.values].reset_index(drop=True)
+            outliers_flagged = stat_before - len(dfs["VideoStat"])
 
-        # 全量覆盖：清空 processed/
+        # 7. 写出 Parquet
         self._processed_dir.mkdir(parents=True, exist_ok=True)
         for f in self._processed_dir.glob("*.parquet"):
             f.unlink()
+        for table_name, df in dfs.items():
+            if not df.empty:
+                df.to_parquet(self._processed_dir / f"{table_name}.parquet", index=False)
 
-        writers: dict[str, pq.ParquetWriter] = {}
-
-        for i in range(0, len(files), self._batch_size):
-            batch = files[i:i + self._batch_size]
-
-            # 2.1 加载
-            records = []
-            for fp in batch:
-                with open(fp, encoding="utf-8") as fh:
-                    records.append(json.load(fh))
-
-            # 2.2 拆表
-            dfs = self._extract_tables(records)
-
-            # 2.3 缺失值: count before fill for report
-            na_before = sum(df.isna().sum().sum() for df in dfs.values())
-            dfs = self._fill_missing(dfs)
-            missing_filled += na_before
-
-            # 2.4 去重（批次内 + 跨批次）
-            video_df = dfs["Video"]
-            before = len(video_df)
-            if not video_df.empty:
-                # 批次内去重：保留每个 aid 首次出现
-                in_batch_mask = ~video_df["aid"].duplicated(keep='first')
-                # 跨批次去重：排除已在 seen_aids 中的 aid
-                cross_batch_mask = ~video_df["aid"].isin(seen_aids)
-                # 合并两个条件
-                keep_mask = in_batch_mask & cross_batch_mask
-
-                dfs["Video"] = video_df[keep_mask].reset_index(drop=True)
-                duplicates_dropped += before - len(dfs["Video"])
-
-                # 同步去重到关联表（按行位置对应）
-                kept_mask = keep_mask.values
-            else:
-                kept_mask = None
-                duplicates_dropped += before
-
-            if kept_mask is not None:
-                dfs["VideoStat"] = dfs["VideoStat"].loc[kept_mask].reset_index(drop=True) if not dfs["VideoStat"].empty else dfs["VideoStat"]
-                dfs["Creator"] = dfs["Creator"].loc[kept_mask].reset_index(drop=True) if not dfs["Creator"].empty else dfs["Creator"]
-                dfs["Category"] = dfs["Category"].loc[kept_mask].reset_index(drop=True) if not dfs["Category"].empty else dfs["Category"]
-
-            if not dfs["Video"].empty:
-                seen_aids.update(dfs["Video"]["aid"].tolist())
-            total_videos += len(dfs["Video"])
-
-            # 2.5 类型转换
-            dfs = self._convert_types(dfs)
-
-            # 2.6 异常值检测
-            stat_df = dfs["VideoStat"]
-            if not stat_df.empty:
-                stat_before = len(stat_df)
-                valid = (
-                    (stat_df["view"] >= 0) &
-                    (stat_df["like"] >= 0) &
-                    (stat_df["coin"] >= 0) &
-                    (stat_df["favorite"] >= 0) &
-                    (stat_df["share"] >= 0) &
-                    (stat_df["reply"] >= 0) &
-                    (stat_df["danmaku"] >= 0)
-                )
-                dfs["VideoStat"] = stat_df[valid].reset_index(drop=True)
-                # 同步过滤关联表（按行位置）
-                if not valid.all():
-                    dfs["Video"] = dfs["Video"].loc[valid.values].reset_index(drop=True)
-                    dfs["Creator"] = dfs["Creator"].loc[valid.values].reset_index(drop=True)
-                    dfs["Category"] = dfs["Category"].loc[valid.values].reset_index(drop=True)
-                outliers_flagged += stat_before - len(dfs["VideoStat"])
-
-            # 2.7 写出 Parquet
-            for table_name in ["Weekly", "Video", "Creator", "Category", "VideoStat"]:
-                df = dfs[table_name]
-                if df.empty:
-                    continue
-                out_path = self._processed_dir / f"{table_name}.parquet"
-                table = pa.Table.from_pandas(df, preserve_index=False)
-                if table_name not in writers:
-                    writers[table_name] = pq.ParquetWriter(out_path, table.schema)
-                writers[table_name].write_table(table)
-
-        # 关闭所有 writer
-        for w in writers.values():
-            w.close()
-
+        total_videos = len(dfs["Video"])
+        total_weeks = len(files)
         duration = time.monotonic() - start_time
         return CleanReport(
-            total_weeks=total_weeks,
-            total_videos=total_videos,
-            duplicates_dropped=duplicates_dropped,
-            missing_filled=missing_filled,
-            outliers_flagged=outliers_flagged,
-            duration_seconds=round(duration, 2),
+            total_weeks=total_weeks, total_videos=total_videos,
+            duplicates_dropped=duplicates_dropped, missing_filled=missing_filled,
+            outliers_flagged=outliers_flagged, duration_seconds=round(duration, 2),
         )
 
     # ── 清洗子步骤 ──────────────────────────────────────────
