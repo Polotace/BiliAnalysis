@@ -1,14 +1,20 @@
 """Bilibili "每周必看" API 封装。"""
 from typing import Any
+from urllib.parse import urlencode
+
 import aiohttp
 from bilianalysis.utils.fetch import get
+from bilianalysis.crawler.signer import WbiSigner
 
 BASE_URL = "https://api.bilibili.com/x/web-interface/popular/series"
 
 
-async def list_series(session: aiohttp.ClientSession) -> list[dict[str, Any]]:
+async def list_series(
+    session: aiohttp.ClientSession, signer: WbiSigner
+) -> list[dict[str, Any]]:
     """获取所有期数列表。返回 data.list，按 number 升序排列。"""
-    url = f"{BASE_URL}/list"
+    params = signer.sign({})
+    url = f"{BASE_URL}/list?{urlencode(params)}"
     resp = await get(session, url)
     items: list[dict[str, Any]] = resp.get("data", {}).get("list", [])
     items.sort(key=lambda x: x.get("number", 0))
@@ -16,10 +22,11 @@ async def list_series(session: aiohttp.ClientSession) -> list[dict[str, Any]]:
 
 
 async def get_weekly_videos(
-    session: aiohttp.ClientSession, number: int
+    session: aiohttp.ClientSession, number: int, signer: WbiSigner
 ) -> dict[str, Any]:
     """获取指定期数的完整数据。返回 API 原始 data 字典 {config, list}。
        HttpError 直接透传，由 pipeline 层捕获处理。"""
-    url = f"{BASE_URL}/one?number={number}"
+    params = signer.sign({"number": str(number)})
+    url = f"{BASE_URL}/one?{urlencode(params)}"
     resp = await get(session, url)
     return resp.get("data", {})
