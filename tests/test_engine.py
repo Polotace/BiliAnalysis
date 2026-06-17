@@ -262,3 +262,111 @@ class TestPandasEngineCleanData:
         df_stat = pd.read_parquet(processed_dir / "VideoStat.parquet")
         assert pd.api.types.is_float_dtype(df_stat["view"])
         assert pd.api.types.is_float_dtype(df_stat["like"])
+
+
+class TestPandasEngineStatistics:
+    def _create_parquet_files(self, processed_dir: Path):
+        """在 processed_dir 下创建 5 张测试 Parquet。"""
+        processed_dir.mkdir(parents=True, exist_ok=True)
+
+        pd.DataFrame({
+            "number": [1, 2], "subject": ["第1期", "第2期"],
+            "name": ["每周必看 01", "每周必看 02"],
+            "start_time": [1600000000.0, 1600600000.0],
+            "end_time": [1600300000.0, 1600900000.0],
+        }).to_parquet(processed_dir / "Weekly.parquet", index=False)
+
+        pd.DataFrame({
+            "aid": [100, 101, 200], "bvid": ["BV001", "BV002", "BV003"],
+            "title": ["v1", "v2", "v3"], "desc": ["", "", ""],
+            "duration": [120, 180, 150], "pubdate": [1600000000.0, 1600000000.0, 1600600000.0],
+            "cid": [10, 11, 20], "pic": ["", "", ""],
+        }).to_parquet(processed_dir / "Video.parquet", index=False)
+
+        pd.DataFrame({
+            "mid": [1100, 1101, 1200], "name": ["UP1", "UP2", "UP3"],
+            "face": ["", "", ""],
+        }).to_parquet(processed_dir / "Creator.parquet", index=False)
+
+        pd.DataFrame({
+            "tid": [1, 1, 2], "tname": ["动画", "动画", "游戏"],
+            "tid_v2": [0, 0, 0], "tname_v2": ["", "", ""],
+        }).to_parquet(processed_dir / "Category.parquet", index=False)
+
+        pd.DataFrame({
+            "aid": [100, 101, 200],
+            "view": [10000.0, 20000.0, 30000.0],
+            "like": [500.0, 1000.0, 1500.0],
+            "coin": [100.0, 200.0, 300.0],
+            "favorite": [200.0, 400.0, 600.0],
+            "share": [30.0, 50.0, 70.0],
+            "reply": [50.0, 100.0, 150.0],
+            "danmaku": [60.0, 120.0, 180.0],
+        }).to_parquet(processed_dir / "VideoStat.parquet", index=False)
+
+    def test_statistics_overall(self, tmp_path):
+        """验证 overall 统计值的正确性。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_parquet_files(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.statistics()
+
+        assert report.overall.total_videos == 3
+        assert report.overall.total_creators == 3
+        assert report.overall.avg_view == 20000.0
+        assert report.overall.avg_like == 1000.0
+        assert report.overall.avg_coin == 200.0
+        assert report.overall.avg_favorite == 400.0
+        assert report.overall.avg_share == 50.0
+        assert report.overall.avg_danmaku == 120.0
+
+    def test_statistics_by_category(self, tmp_path):
+        """验证分区统计。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_parquet_files(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.statistics()
+
+        assert len(report.by_category) == 2  # 动画, 游戏
+        tnames = [c.tname for c in report.by_category]
+        assert "动画" in tnames
+        assert "游戏" in tnames
+
+    def test_statistics_by_creator_top10(self, tmp_path):
+        """验证 UP主 TOP10 按出现次数排序。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_parquet_files(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.statistics()
+
+        assert len(report.by_creator) <= 10
+        assert len(report.by_creator) == 3
+
+    def test_statistics_by_week(self, tmp_path):
+        """验证按周趋势（2 周数据）。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_parquet_files(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.statistics()
+
+        assert len(report.by_week) == 2
+        assert report.by_week[0].week_number == 1
+        assert report.by_week[0].video_count == 2  # aid 100, 101 (pubdate in week 1 range)
+        assert report.by_week[1].week_number == 2
+        assert report.by_week[1].video_count == 1  # aid 200 (pubdate in week 2 range)

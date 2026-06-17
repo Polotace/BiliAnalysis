@@ -9,7 +9,10 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from bilianalysis.config.model import DataSection
-from bilianalysis.engine.base import AnalysisEngine, CleanReport, StatReport, ClusterReport, PredictionReport
+from bilianalysis.engine.base import (
+    AnalysisEngine, CleanReport, StatReport, ClusterReport, PredictionReport,
+    OverallStats, CategoryStats, CreatorStats, WeeklyTrend,
+)
 
 
 class PandasEngine(AnalysisEngine):
@@ -280,7 +283,113 @@ class PandasEngine(AnalysisEngine):
     # ── statistics ───────────────────────────────────────────
 
     def statistics(self) -> StatReport:
-        raise NotImplementedError("statistics: to be implemented in Task 4")
+        """从 processed/ Parquet 读取 → join → groupby 聚合 → StatReport。"""
+        # 1. 读取 5 张 Parquet 表
+        weekly = pd.read_parquet(self._processed_dir / "Weekly.parquet")
+        video = pd.read_parquet(self._processed_dir / "Video.parquet")
+        video_stat = pd.read_parquet(self._processed_dir / "VideoStat.parquet")
+        creator = pd.read_parquet(self._processed_dir / "Creator.parquet")
+        category = pd.read_parquet(self._processed_dir / "Category.parquet")
+
+        # 2. Merge Video + VideoStat on aid
+        df = video.merge(video_stat, on="aid", how="inner")
+
+        # 3. 按行位置分配 Creator 和 Category 信息
+        #    clean_data 保证 Creator/Category 与 Video 行顺序一致
+        df["creator_mid"] = creator["mid"].values
+        df["creator_name"] = creator["name"].values
+        df["tname"] = category["tname"].values
+
+        # 4. 匹配每期视频所属周次（pubdate ∈ [start_time, end_time]）
+        #    使用 cross join + 过滤实现向量化匹配
+        df = df.assign(_key=1).merge(weekly.assign(_key=1), on="_key").drop(columns="_key")
+        df = df[(df["start_time"] <= df["pubdate"]) & (df["pubdate"] <= df["end_time"])]
+        week_number_map = df[["number"]].rename(columns={"number": "week_number"})
+        # 将 week_number 关联回原 df（按索引）
+        df["week_number"] = week_number_map["week_number"].values
+
+        # 5. 计算交互率（view=0 替换为 1 避免除零）
+        view_safe = df["view"].replace(0, 1.0)
+        df["like_rate"] = df["like"] / view_safe
+        df["coin_rate"] = df["coin"] / view_safe
+        df["favorite_rate"] = df["favorite"] / view_safe
+
+        # 6. OverallStats
+        overall = OverallStats(
+            total_videos=len(df),
+            total_creators=int(df["creator_mid"].nunique()),
+            avg_view=float(df["view"].mean()),
+            avg_like=float(df["like"].mean()),
+            avg_coin=float(df["coin"].mean()),
+            avg_favorite=float(df["favorite"].mean()),
+            avg_share=float(df["share"].mean()),
+            avg_danmaku=float(df["danmaku"].mean()),
+            avg_like_rate=float(df["like_rate"].mean()),
+            avg_coin_rate=float(df["coin_rate"].mean()),
+            avg_favorite_rate=float(df["favorite_rate"].mean()),
+        )
+
+        # 7. by_category
+        cat_agg = df.groupby("tname").agg(
+            video_count=("aid", "count"),
+            avg_view=("view", "mean"),
+            avg_like=("like", "mean"),
+            avg_interaction_rate=("like_rate", "mean"),
+        ).reset_index()
+        by_category = [
+            CategoryStats(
+                tname=row["tname"],
+                video_count=int(row["video_count"]),
+                avg_view=float(row["avg_view"]),
+                avg_like=float(row["avg_like"]),
+                avg_interaction_rate=float(row["avg_interaction_rate"]),
+            )
+            for _, row in cat_agg.iterrows()
+        ]
+
+        # 8. by_creator (TOP10，按出现次数降序)
+        creator_agg = df.groupby(["creator_mid", "creator_name"]).agg(
+            appearance_count=("aid", "count"),
+            total_view=("view", "sum"),
+            total_like=("like", "sum"),
+            total_favorite=("favorite", "sum"),
+        ).reset_index().sort_values("appearance_count", ascending=False).head(10)
+        by_creator = [
+            CreatorStats(
+                mid=int(row["creator_mid"]),
+                name=row["creator_name"],
+                appearance_count=int(row["appearance_count"]),
+                total_view=int(row["total_view"]),
+                total_like=int(row["total_like"]),
+                total_favorite=int(row["total_favorite"]),
+            )
+            for _, row in creator_agg.iterrows()
+        ]
+
+        # 9. by_week（按周次排序）
+        week_agg = df.groupby("week_number").agg(
+            video_count=("aid", "count"),
+            avg_view=("view", "mean"),
+            avg_like=("like", "mean"),
+            avg_interaction_rate=("like_rate", "mean"),
+        ).reset_index().sort_values("week_number")
+        by_week = [
+            WeeklyTrend(
+                week_number=int(row["week_number"]),
+                video_count=int(row["video_count"]),
+                avg_view=float(row["avg_view"]),
+                avg_like=float(row["avg_like"]),
+                avg_interaction_rate=float(row["avg_interaction_rate"]),
+            )
+            for _, row in week_agg.iterrows()
+        ]
+
+        return StatReport(
+            overall=overall,
+            by_category=by_category,
+            by_creator=by_creator,
+            by_week=by_week,
+        )
 
     # ── clustering ───────────────────────────────────────────
 
