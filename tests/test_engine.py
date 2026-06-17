@@ -370,3 +370,114 @@ class TestPandasEngineStatistics:
         assert report.by_week[0].video_count == 2  # aid 100, 101 (pubdate in week 1 range)
         assert report.by_week[1].week_number == 2
         assert report.by_week[1].video_count == 1  # aid 200 (pubdate in week 2 range)
+
+
+class TestPandasEngineClustering:
+    def _create_clustering_data(self, processed_dir: Path):
+        """创建适合聚类的测试数据（3 种视频类型模拟）。"""
+        processed_dir.mkdir(parents=True, exist_ok=True)
+
+        # 3 类视频: 爆款(高播放高互动), 普通(中), 潜力(低播放高互动率)
+        vids = []
+        cats = []
+        for i in range(30):
+            vids.append({
+                "aid": i + 1, "bvid": f"BV{i}", "title": f"v{i}", "desc": "",
+                "duration": 120, "pubdate": 1600000000.0, "cid": i * 10, "pic": "",
+            })
+            cats.append({"tid": 1, "tname": "动画", "tid_v2": 0, "tname_v2": ""})
+
+        pd.DataFrame(vids).to_parquet(processed_dir / "Video.parquet", index=False)
+        pd.DataFrame(cats).to_parquet(processed_dir / "Category.parquet", index=False)
+
+        pd.DataFrame({
+            "mid": list(range(1001, 1031)), "name": [f"UP{i}" for i in range(1, 31)],
+            "face": [""] * 30,
+        }).to_parquet(processed_dir / "Creator.parquet", index=False)
+
+        # 生成 3 聚类: 0-9 爆款(高播放高互动率), 10-19 普通(中), 20-29 潜力(低播放)
+        import numpy as np
+        np.random.seed(42)
+        aids = list(range(1, 31))
+        views, likes, coins, favorites = [], [], [], []
+        for i in range(30):
+            if i < 10:
+                views.append(np.random.randint(80000, 120000))
+                likes.append(np.random.randint(20000, 30000))
+                coins.append(np.random.randint(5000, 8000))
+                favorites.append(np.random.randint(8000, 12000))
+            elif i < 20:
+                views.append(np.random.randint(40000, 70000))
+                likes.append(np.random.randint(1500, 3000))
+                coins.append(np.random.randint(400, 700))
+                favorites.append(np.random.randint(800, 1500))
+            else:
+                views.append(np.random.randint(8000, 25000))
+                likes.append(np.random.randint(200, 500))
+                coins.append(np.random.randint(50, 100))
+                favorites.append(np.random.randint(100, 200))
+
+        pd.DataFrame({
+            "aid": aids, "view": [float(v) for v in views],
+            "like": [float(l) for l in likes],
+            "coin": [float(c) for c in coins],
+            "favorite": [float(f) for f in favorites],
+            "share": [10.0] * 30, "reply": [20.0] * 30, "danmaku": [30.0] * 30,
+        }).to_parquet(processed_dir / "VideoStat.parquet", index=False)
+
+        pd.DataFrame({
+            "number": [1], "subject": ["第1期"], "name": ["每周必看 01"],
+            "start_time": [1600000000.0], "end_time": [1600600000.0],
+        }).to_parquet(processed_dir / "Weekly.parquet", index=False)
+
+    def test_clustering_structure(self, tmp_path):
+        """验证聚类报告基本结构。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_clustering_data(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.clustering()
+
+        assert report.clusters.k == 3
+        assert len(report.clusters.clusters) == 3
+        assert report.clusters.silhouette_score > 0
+        assert "view" in report.clusters.feature_importance
+        assert "like" in report.clusters.feature_importance
+
+    def test_clustering_scatter_data(self, tmp_path):
+        """验证散点图数据格式正确。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_clustering_data(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.clustering()
+
+        scatter = report.scatter_data
+        assert "labels" in scatter
+        assert "x" in scatter
+        assert "y" in scatter
+        assert len(scatter["labels"]) == 30
+        assert len(scatter["x"]) == 30
+        assert len(scatter["y"]) == 30
+
+    def test_clustering_tags_present(self, tmp_path):
+        """验证三个聚类都有标签。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_clustering_data(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.clustering()
+
+        tags = {c.tag for c in report.clusters.clusters}
+        assert "爆款视频" in tags
+        assert "普通热门" in tags
+        assert "潜力视频" in tags

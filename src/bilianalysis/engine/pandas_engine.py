@@ -8,10 +8,16 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
+
 from bilianalysis.config.model import DataSection
 from bilianalysis.engine.base import (
     AnalysisEngine, CleanReport, StatReport, ClusterReport, PredictionReport,
     OverallStats, CategoryStats, CreatorStats, WeeklyTrend,
+    ClusterGroup, ClusterResult,
 )
 
 
@@ -394,7 +400,82 @@ class PandasEngine(AnalysisEngine):
     # ── clustering ───────────────────────────────────────────
 
     def clustering(self) -> ClusterReport:
-        raise NotImplementedError("clustering: to be implemented in Task 5")
+        """从 processed/ Stat 读取 → StandardScaler → KMeans(k=3) → PCA(2D) → ClusterReport。"""
+        start_time = time.monotonic()
+        stat = pd.read_parquet(self._processed_dir / "VideoStat.parquet")
+
+        # 特征选取
+        features = ["view", "like", "coin", "favorite"]
+        X = stat[features].copy()
+
+        # 标准化
+        scaler = StandardScaler()
+        X_scaled = scaler.fit_transform(X)
+
+        # KMeans
+        kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+        labels = kmeans.fit_predict(X_scaled)
+
+        # Silhouette score
+        sil_score = silhouette_score(X_scaled, labels)
+
+        # Feature importance: 各特征在聚类中心的方差
+        centers = pd.DataFrame(kmeans.cluster_centers_, columns=features)
+        importance = {f: round(float(centers[f].var()), 4) for f in features}
+
+        # 构建每个 cluster 的信息
+        stat["interaction"] = stat["like"] + stat["coin"] + stat["favorite"]
+        stat["interaction_rate"] = stat["interaction"] / stat["view"].replace(0, 1)
+        stat["label"] = labels
+
+        # 先计算每个 cluster 的 avg_view，用于按播放量排名打标签
+        label_view_rank = {}
+        for label_idx in range(3):
+            mask = stat["label"] == label_idx
+            label_view_rank[label_idx] = float(stat.loc[mask, "view"].mean())
+
+        # 按 avg_view 降序排名：最高 → "爆款视频"，其次 → "普通热门"，最低 → "潜力视频"
+        sorted_labels = sorted(label_view_rank, key=label_view_rank.get, reverse=True)
+        tag_map = {sorted_labels[0]: "爆款视频", sorted_labels[1]: "普通热门", sorted_labels[2]: "潜力视频"}
+
+        clusters = []
+        for label_idx in range(3):
+            mask = stat["label"] == label_idx
+            cluster_data = stat[mask]
+            cluster_X = X[mask]
+            centroid = {f: round(float(cluster_X[f].mean()), 2) for f in features}
+
+            avg_view = float(cluster_data["view"].mean())
+            avg_like = float(cluster_data["like"].mean())
+            avg_coin = float(cluster_data["coin"].mean())
+            avg_favorite = float(cluster_data["favorite"].mean())
+
+            tag = tag_map[label_idx]
+            sample_ids = cluster_data["aid"].head(20).astype(int).tolist()
+
+            clusters.append(ClusterGroup(
+                label=label_idx, tag=tag, count=int(mask.sum()),
+                centroid=centroid, avg_view=round(avg_view, 2),
+                avg_like=round(avg_like, 2), avg_coin=round(avg_coin, 2),
+                avg_favorite=round(avg_favorite, 2), sample_ids=sample_ids,
+            ))
+
+        # PCA 降维供散点图
+        pca = PCA(n_components=2, random_state=42)
+        X_pca = pca.fit_transform(X_scaled)
+        scatter_data = {
+            "labels": labels.tolist(),
+            "x": [round(float(v), 4) for v in X_pca[:, 0].tolist()],
+            "y": [round(float(v), 4) for v in X_pca[:, 1].tolist()],
+        }
+
+        duration = time.monotonic() - start_time
+        return ClusterReport(
+            clusters=ClusterResult(k=3, clusters=clusters, silhouette_score=round(float(sil_score), 4),
+                                   feature_importance=importance),
+            scatter_data=scatter_data,
+            duration_seconds=round(duration, 2),
+        )
 
     # ── prediction ───────────────────────────────────────────
 
