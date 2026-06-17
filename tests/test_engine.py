@@ -481,3 +481,96 @@ class TestPandasEngineClustering:
         assert "爆款视频" in tags
         assert "普通热门" in tags
         assert "潜力视频" in tags
+
+
+class TestPandasEnginePrediction:
+    def _create_weekly_data(self, processed_dir: Path):
+        """创建 10 周的测试数据。"""
+        processed_dir.mkdir(parents=True, exist_ok=True)
+
+        import numpy as np
+        np.random.seed(42)
+
+        weekly = []
+        vids, stats, creators, cats = [], [], [], []
+        aid_counter = 1
+
+        for week_num in range(1, 11):
+            base_time = 1600000000 + (week_num - 1) * 604800
+            weekly.append({
+                "number": week_num, "subject": f"第{week_num}期",
+                "name": f"每周必看 {week_num:02d}",
+                "start_time": float(base_time), "end_time": float(base_time + 604800),
+            })
+            for j in range(5):
+                base_view = 10000 + week_num * 2000 + np.random.randint(-1000, 1000)
+                vids.append({
+                    "aid": aid_counter, "bvid": f"BV{aid_counter}", "title": f"v{aid_counter}",
+                    "desc": "", "duration": 120, "pubdate": float(base_time + j * 10000),
+                    "cid": aid_counter * 10, "pic": "",
+                })
+                stats.append({
+                    "aid": aid_counter, "view": float(max(0, base_view)),
+                    "like": float(max(0, base_view * 0.05 + np.random.randint(-50, 50))),
+                    "coin": float(max(0, base_view * 0.01)), "favorite": float(max(0, base_view * 0.02)),
+                    "share": 10.0, "reply": 20.0, "danmaku": 30.0,
+                })
+                creators.append({"mid": 1000 + aid_counter, "name": f"UP{aid_counter}", "face": ""})
+                cats.append({"tid": 1, "tname": "动画", "tid_v2": 0, "tname_v2": ""})
+                aid_counter += 1
+
+        pd.DataFrame(weekly).to_parquet(processed_dir / "Weekly.parquet", index=False)
+        pd.DataFrame(vids).to_parquet(processed_dir / "Video.parquet", index=False)
+        pd.DataFrame(stats).to_parquet(processed_dir / "VideoStat.parquet", index=False)
+        pd.DataFrame(creators).to_parquet(processed_dir / "Creator.parquet", index=False)
+        pd.DataFrame(cats).to_parquet(processed_dir / "Category.parquet", index=False)
+
+    def test_prediction_structure(self, tmp_path):
+        """验证预测报告基本结构。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_weekly_data(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.prediction()
+
+        assert report.view_predict.model_type == "linear_regression"
+        assert report.view_predict.target == "view"
+        assert -1.0 <= report.view_predict.r2_score <= 1.0  # R² range
+        assert report.view_predict.mae >= 0
+        assert len(report.view_predict.fitted) == 10  # historical fit
+        assert len(report.view_predict.forecast) == 4  # next 4 weeks
+        assert "week_number" in report.view_predict.coefficients
+
+    def test_prediction_forecast_future_weeks(self, tmp_path):
+        """验证预测的未来周号 > 历史最大周号。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_weekly_data(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.prediction()
+
+        max_hist_week = max(f["week_number"] for f in report.view_predict.fitted)
+        forecast_weeks = [f["week_number"] for f in report.view_predict.forecast]
+        assert all(w > max_hist_week for w in forecast_weeks)
+
+    def test_prediction_both_targets(self, tmp_path):
+        """验证 view 和 like 两个预测目标都存在。"""
+        raw_dir = tmp_path / "raw"
+        raw_dir.mkdir()
+        processed_dir = tmp_path / "processed"
+        self._create_weekly_data(processed_dir)
+
+        data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
+        engine = PandasEngine(data_conf)
+        report = engine.prediction()
+
+        assert report.view_predict is not None
+        assert report.like_predict is not None
+        assert report.view_predict.target == "view"
+        assert report.like_predict.target == "like"

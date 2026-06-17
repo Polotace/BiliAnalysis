@@ -8,16 +8,18 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score, mean_absolute_error, silhouette_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
-from sklearn.metrics import silhouette_score
+import numpy as np
 
 from bilianalysis.config.model import DataSection
 from bilianalysis.engine.base import (
     AnalysisEngine, CleanReport, StatReport, ClusterReport, PredictionReport,
     OverallStats, CategoryStats, CreatorStats, WeeklyTrend,
-    ClusterGroup, ClusterResult,
+    ClusterGroup, ClusterResult, PredictionResult,
 )
 
 
@@ -480,4 +482,80 @@ class PandasEngine(AnalysisEngine):
     # ── prediction ───────────────────────────────────────────
 
     def prediction(self) -> PredictionReport:
-        raise NotImplementedError("prediction: to be implemented in Task 6")
+        """从 processed/ Parquet → 周聚合序列 → LinearRegression → PredictionReport。"""
+        start_time = time.monotonic()
+        video = pd.read_parquet(self._processed_dir / "Video.parquet")
+        stat = pd.read_parquet(self._processed_dir / "VideoStat.parquet")
+        weekly = pd.read_parquet(self._processed_dir / "Weekly.parquet")
+
+        # 1. Merge Video + VideoStat on aid
+        merged = video.merge(stat, on="aid", how="inner")
+
+        # 2. 匹配每期视频所属周次（pubdate ∈ [start_time, end_time]）
+        #    使用 cross join + 过滤实现向量化匹配（与 statistics() 相同）
+        merged = merged.assign(_key=1).merge(weekly.assign(_key=1), on="_key").drop(columns="_key")
+        merged = merged[(merged["start_time"] <= merged["pubdate"]) & (merged["pubdate"] <= merged["end_time"])]
+        merged["week_number"] = merged["number"]
+
+        # 3. Aggregate by week
+        weekly_agg = merged.groupby("week_number").agg(
+            avg_view=("view", "mean"),
+            avg_like=("like", "mean"),
+            avg_coin=("coin", "mean"),
+            avg_favorite=("favorite", "mean"),
+            video_count=("aid", "count"),
+        ).reset_index().sort_values("week_number")
+
+        def _predict(target: str) -> PredictionResult:
+            df = weekly_agg[weekly_agg["week_number"] > 0].copy()
+            if len(df) < 3:
+                return PredictionResult(
+                    model_type="linear_regression", target=target, r2_score=0.0, mae=0.0,
+                    coefficients={}, intercept=0.0, fitted=[], forecast=[],
+                )
+
+            feature_cols = ["week_number", "video_count"]
+            X = df[feature_cols].values
+            y = df[f"avg_{target}"].values
+
+            model = LinearRegression()
+            model.fit(X, y)
+            y_pred = model.predict(X)
+
+            r2 = r2_score(y, y_pred)
+            mae = mean_absolute_error(y, y_pred)
+            coef = {feature_cols[i]: round(float(model.coef_[i]), 4) for i in range(len(feature_cols))}
+            intercept = round(float(model.intercept_), 2)
+
+            fitted = [
+                {"week_number": int(df.iloc[i]["week_number"]),
+                 "actual": round(float(y[i]), 2),
+                 "predicted": round(float(y_pred[i]), 2)}
+                for i in range(len(df))
+            ]
+
+            last_week = int(df["week_number"].max())
+            avg_vc = int(df["video_count"].mean())
+            future_X = np.array([[last_week + i, avg_vc] for i in range(1, 5)])
+            future_pred = model.predict(future_X)
+            forecast = [
+                {"week_number": int(last_week + i), "predicted": round(float(future_pred[j]), 2)}
+                for j, i in enumerate(range(1, 5))
+            ]
+
+            return PredictionResult(
+                model_type="linear_regression", target=target,
+                r2_score=round(float(r2), 4), mae=round(float(mae), 2),
+                coefficients=coef, intercept=intercept,
+                fitted=fitted, forecast=forecast,
+            )
+
+        view_result = _predict("view")
+        like_result = _predict("like")
+
+        duration = time.monotonic() - start_time
+        return PredictionReport(
+            view_predict=view_result,
+            like_predict=like_result,
+            duration_seconds=round(duration, 2),
+        )
