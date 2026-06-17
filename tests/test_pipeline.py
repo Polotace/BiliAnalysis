@@ -4,6 +4,7 @@ from bilianalysis.crawler import CrawlReport, CrawlRunner as run
 from bilianalysis.config import CrawlerSection
 from bilianalysis.crawler import ProgressFile
 from bilianalysis.utils.fetch import HttpError
+from bilianalysis.crawler.signer import WbiSigner
 
 
 SERIES_LIST = [
@@ -49,18 +50,24 @@ class TestCrawlReport:
 
 
 class TestRun:
+    @pytest.fixture
+    def signer(self):
+        return WbiSigner("test_key_32_bytes_0123456789")
+
     @pytest.mark.asyncio
-    async def test_full_crawl_success(self, tmp_path, monkeypatch):
+    async def test_full_crawl_success(self, tmp_path, monkeypatch, signer):
         """集成测试：模拟完整爬取流程"""
         monkeypatch.setattr("bilianalysis.crawler.storage.DATA_DIR", tmp_path)
 
         mock_list_series = AsyncMock(return_value=SERIES_LIST)
         mock_get_weekly = AsyncMock(return_value=WEEKLY_DATA)
+        mock_fetch_key = AsyncMock(return_value="test_key_32_bytes_0123456789")
 
-        with patch("bilianalysis.crawler.pipeline.list_series", mock_list_series):
-            with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
-                report = await run(config)
+        with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
+            with patch("bilianalysis.crawler.pipeline.list_series", mock_list_series):
+                with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
+                    config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
+                    report = await run(config)
 
         assert report.total == 3
         assert report.crawled == 3
@@ -69,7 +76,7 @@ class TestRun:
         assert report.duration_seconds > 0
 
     @pytest.mark.asyncio
-    async def test_skips_already_crawled(self, tmp_path, monkeypatch):
+    async def test_skips_already_crawled(self, tmp_path, monkeypatch, signer):
         """已爬取的期号被跳过"""
         from bilianalysis.crawler import save_progress
         monkeypatch.setattr("bilianalysis.crawler.storage.DATA_DIR", tmp_path)
@@ -77,32 +84,37 @@ class TestRun:
 
         mock_list_series = AsyncMock(return_value=SERIES_LIST)
         mock_get_weekly = AsyncMock(return_value=WEEKLY_DATA)
+        mock_fetch_key = AsyncMock(return_value="test_key_32_bytes_0123456789")
 
-        with patch("bilianalysis.crawler.pipeline.list_series", mock_list_series):
-            with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
-                report = await run(config)
+        with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
+            with patch("bilianalysis.crawler.pipeline.list_series", mock_list_series):
+                with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
+                    config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
+                    report = await run(config)
 
         assert report.skipped == 2
         assert report.crawled == 1  # only week 3
         assert mock_get_weekly.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_retries_failed_then_skips(self, tmp_path, monkeypatch):
+    async def test_retries_failed_then_skips(self, tmp_path, monkeypatch, signer):
         """失败期号重试一次，仍失败则保留"""
         from bilianalysis.crawler import save_progress, load_progress
         monkeypatch.setattr("bilianalysis.crawler.storage.DATA_DIR", tmp_path)
         await save_progress(ProgressFile(crawled=[1], failed={2: "prev timeout"}))
 
-        async def mock_get_weekly(session, number):
+        async def mock_get_weekly(session, number, signer=None):
             if number == 2:
                 raise HttpError(502, "bad gateway")
             return WEEKLY_DATA
 
-        with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
-            with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
-                report = await run(config)
+        mock_fetch_key = AsyncMock(return_value="test_key_32_bytes_0123456789")
+
+        with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
+            with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
+                with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
+                    config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
+                    report = await run(config)
 
         assert report.crawled == 1  # only week 3
         assert report.skipped == 1  # week 1 already done
@@ -114,34 +126,40 @@ class TestRun:
         assert 3 in progress.crawled
 
     @pytest.mark.asyncio
-    async def test_failed_retry_recovered(self, tmp_path, monkeypatch):
+    async def test_failed_retry_recovered(self, tmp_path, monkeypatch, signer):
         """失败期号重试成功，从 failed 移除"""
         from bilianalysis.crawler import save_progress, load_progress
         monkeypatch.setattr("bilianalysis.crawler.storage.DATA_DIR", tmp_path)
         await save_progress(ProgressFile(crawled=[1], failed={2: "prev timeout"}))
 
-        async def mock_get_weekly(session, number):
+        async def mock_get_weekly(session, number, signer=None):
             return WEEKLY_DATA
 
-        with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
-            with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
-                report = await run(config)
+        mock_fetch_key = AsyncMock(return_value="test_key_32_bytes_0123456789")
+
+        with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
+            with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
+                with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
+                    config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
+                    report = await run(config)
 
         progress = await load_progress()
         assert 2 not in progress.failed
         assert 2 in progress.crawled
 
     @pytest.mark.asyncio
-    async def test_concurrent_mode(self, tmp_path, monkeypatch):
+    async def test_concurrent_mode(self, tmp_path, monkeypatch, signer):
         """并发模式正常完成"""
         from bilianalysis.crawler import save_progress
         monkeypatch.setattr("bilianalysis.crawler.storage.DATA_DIR", tmp_path)
         await save_progress(ProgressFile())
 
-        with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
-            with patch("bilianalysis.crawler.pipeline.get_weekly_videos", AsyncMock(return_value=WEEKLY_DATA)):
-                config = CrawlerSection(mode="concurrent", concurrency=3, retry_delay=0)
-                report = await run(config)
+        mock_fetch_key = AsyncMock(return_value="test_key_32_bytes_0123456789")
+
+        with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
+            with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
+                with patch("bilianalysis.crawler.pipeline.get_weekly_videos", AsyncMock(return_value=WEEKLY_DATA)):
+                    config = CrawlerSection(mode="concurrent", concurrency=3, retry_delay=0)
+                    report = await run(config)
 
         assert report.crawled == 3

@@ -12,6 +12,7 @@ from bilianalysis.config import CrawlerSection, load_config
 from .api import list_series, get_weekly_videos
 from .storage import save_week, load_progress, save_progress, get_pending_weeks
 from bilianalysis.utils.fetch import create_session, HttpError
+from .signer import fetch_mixin_key, WbiSigner
 
 def _jitter(base: float) -> float:
     """在基础延迟上叠加 ±1 秒随机抖动，避免请求间隔过于规律被反爬。"""
@@ -37,9 +38,11 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
     failed_details: dict[int, str] = {}
 
     session = create_session()
+    mixin_key = await fetch_mixin_key(session)
+    signer = WbiSigner(mixin_key)
     try:
         # 1. 获取所有期号
-        series = await list_series(session)
+        series = await list_series(session, signer)
         if not series:
             return CrawlReport(
                 total=0, crawled=0, skipped=0, failed=0,
@@ -61,7 +64,7 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
         # 3. 先处理历史失败期号（每个仅尝试 1 次）
         for number in retry_list:
             try:
-                data = await get_weekly_videos(session, number)
+                data = await get_weekly_videos(session, number, signer)
             except HttpError as e:
                 progress.failed[number] = str(e)
                 failed_count += 1
@@ -78,7 +81,7 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
         # 4. 处理新期号
         if config.mode == "sequential":
             for number in pending_list:
-                success, err_msg = await _crawl_one(session, number, config)
+                success, err_msg = await _crawl_one(session, number, config, signer)
                 if success:
                     crawled_count += 1
                 else:
@@ -90,7 +93,7 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
 
             async def crawl_with_semaphore(number: int):
                 async with semaphore:
-                    success, err_msg = await _crawl_one(session, number, config)
+                    success, err_msg = await _crawl_one(session, number, config, signer)
                     return number, success, err_msg
 
             results = await asyncio.gather(
@@ -122,12 +125,12 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
 
 
 async def _crawl_one(session: aiohttp.ClientSession, number: int,
-                     config: CrawlerSection) -> tuple[bool, str]:
+                     config: CrawlerSection, signer: WbiSigner) -> tuple[bool, str]:
     """爬取单期，含重试逻辑。返回 (成功, 错误信息)。"""
     last_error = ""
     for attempt in range(1, config.max_retries + 1):
         try:
-            data = await get_weekly_videos(session, number)
+            data = await get_weekly_videos(session, number, signer)
         except HttpError as e:
             last_error = str(e)
             if attempt < config.max_retries:
