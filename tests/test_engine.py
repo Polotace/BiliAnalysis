@@ -145,7 +145,7 @@ class TestPandasEngineCleanData:
             (raw_dir / f"week_{n:03d}.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
         data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
-        engine = PandasEngine(data_conf, batch_size=5)
+        engine = PandasEngine(data_conf)
         report = await engine.clean_data()
 
         assert report.total_weeks == 2
@@ -160,8 +160,8 @@ class TestPandasEngineCleanData:
             assert len(df) > 0, f"{table} should have rows"
 
     @pytest.mark.asyncio
-    async def test_clean_data_sliding_window(self, tmp_path, monkeypatch):
-        """3 个 week，batch_size=2，验证滑动窗口分两批处理。"""
+    async def test_clean_data_full_load(self, tmp_path, monkeypatch):
+        """3 个 week，全量加载一次处理。"""
         raw_dir = tmp_path / "raw"
         processed_dir = tmp_path / "processed"
         raw_dir.mkdir()
@@ -171,7 +171,7 @@ class TestPandasEngineCleanData:
             (raw_dir / f"week_{n:03d}.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
         data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
-        engine = PandasEngine(data_conf, batch_size=2)
+        engine = PandasEngine(data_conf)
         report = await engine.clean_data()
 
         assert report.total_weeks == 3
@@ -194,7 +194,7 @@ class TestPandasEngineCleanData:
         (raw_dir / "week_001.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
         data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
-        engine = PandasEngine(data_conf, batch_size=10)
+        engine = PandasEngine(data_conf)
         report = await engine.clean_data()
 
         assert report.missing_filled > 0
@@ -217,7 +217,7 @@ class TestPandasEngineCleanData:
         (raw_dir / "week_002.json").write_text(json.dumps(data2, ensure_ascii=False), encoding="utf-8")
 
         data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
-        engine = PandasEngine(data_conf, batch_size=2)
+        engine = PandasEngine(data_conf)
         report = await engine.clean_data()
 
         assert report.duplicates_dropped == 1
@@ -236,7 +236,7 @@ class TestPandasEngineCleanData:
         (raw_dir / "week_001.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
         data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
-        engine = PandasEngine(data_conf, batch_size=10)
+        engine = PandasEngine(data_conf)
         report = await engine.clean_data()
 
         assert report.outliers_flagged >= 1
@@ -252,7 +252,7 @@ class TestPandasEngineCleanData:
         (raw_dir / "week_001.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
 
         data_conf = DataSection(raw_dir=str(raw_dir), processed_dir=str(processed_dir))
-        engine = PandasEngine(data_conf, batch_size=10)
+        engine = PandasEngine(data_conf)
         await engine.clean_data()
 
         df_video = pd.read_parquet(processed_dir / "Video.parquet")
