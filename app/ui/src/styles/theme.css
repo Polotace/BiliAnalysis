@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+/* ── Design Tokens (spec §4) ── */
+@theme {
+  --color-blue: #00AEEC;
+  --color-blue-light: #E6F7FD;
+  --color-bg: #FAFAFA;
+  --color-card: #FFFFFF;
+  --color-text: #111827;
+  --color-text-secondary: #6B7280;
+  --color-border: #E5E7EB;
+  --color-success: #22C55E;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --font-family-sans: 'Inter', 'HarmonyOS Sans SC', 'PingFang SC', sans-serif;
+  --radius-default: 12px;
+  --radius-lg: 16px;
+  --shadow-default: 0 2px 8px rgba(0, 0, 0, 0.05);
+  --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Base ── */
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-family-sans);
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Tabular numbers for all numeric displays ── */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
