@@ -20,3 +20,5 @@ dist/
 build/
 .superpowers/
 skills-lock.json
+config.yaml
+data/

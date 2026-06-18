@@ -29,5 +29,5 @@ scheduler:
       step_failure: stop
     analysis:
       schedule: ""                 # 空字符串 = 仅手动触发
-      steps: [clean_data, stats, cluster, predict]
+      steps: [clean_data, statistics, clustering, prediction]
       step_failure: stop
