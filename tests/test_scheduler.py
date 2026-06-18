@@ -1,9 +1,13 @@
 """测试调度系统。"""
+from datetime import datetime, timezone
+
 import pytest
 import yaml
 from bilianalysis.config.model import AppConfig, SchedulerConfig, PipelineConfig
 from bilianalysis.scheduler.task import Task, TaskResult, TaskContext
 from bilianalysis.scheduler.registry import register, get_task, list_tasks, clear_registry
+from bilianalysis.scheduler.models import RunRecord
+from bilianalysis.scheduler.runner import PipelineRunner
 
 
 class TestSchedulerConfig:
@@ -118,3 +122,97 @@ class TestRegistry:
 
         names = list_tasks()
         assert names == ["_test_a", "_test_b"]
+
+
+# ——— PipelineRunner 测试用 mock tasks ———
+@register("_mock_success")
+class _MockSuccessTask(Task):
+    name = "_mock_success"
+    async def run(self, ctx: TaskContext) -> TaskResult:
+        return TaskResult(task_name=self.name, status="success", duration_seconds=0.1,
+                          output={"value": 42})
+
+
+@register("_mock_fail")
+class _MockFailTask(Task):
+    name = "_mock_fail"
+    async def run(self, ctx: TaskContext) -> TaskResult:
+        return TaskResult(task_name=self.name, status="failed", duration_seconds=0.1,
+                          error="mock error")
+
+
+class TestRunRecord:
+    def test_run_record_defaults(self):
+        record = RunRecord(pipeline="full", trigger="manual")
+        assert record.status == "running"
+        assert record.pipeline == "full"
+        assert len(record.run_id) == 12
+        assert record.finished_at is None
+
+    def test_run_record_completed(self):
+        record = RunRecord(pipeline="quick", trigger="cron")
+        record.status = "success"
+        record.finished_at = datetime.now(timezone.utc)
+        assert record.status == "success"
+
+
+class TestPipelineRunner:
+    def setup_method(self):
+        clear_registry()
+        register("_mock_success")(_MockSuccessTask)
+        register("_mock_fail")(_MockFailTask)
+
+    def teardown_method(self):
+        clear_registry()
+
+    def _make_config(self, steps, step_failure="stop", max_retries=0):
+        return AppConfig(
+            scheduler=SchedulerConfig(
+                pipelines={
+                    "test": PipelineConfig(
+                        steps=steps,
+                        step_failure=step_failure,
+                        max_retries=max_retries,
+                    )
+                }
+            )
+        )
+
+    @pytest.mark.asyncio
+    async def test_all_success(self):
+        config = self._make_config(["_mock_success", "_mock_success"])
+        runner = PipelineRunner(config)
+        record = await runner.run("test")
+        assert record.status == "success"
+        assert len(record.step_results) == 2
+        assert all(r.status == "success" for r in record.step_results)
+
+    @pytest.mark.asyncio
+    async def test_stop_on_failure(self):
+        config = self._make_config(["_mock_success", "_mock_fail", "_mock_success"],
+                                   step_failure="stop")
+        runner = PipelineRunner(config)
+        record = await runner.run("test")
+        assert record.status == "failed"
+        assert len(record.step_results) == 2
+        assert record.step_results[0].status == "success"
+        assert record.step_results[1].status == "failed"
+
+    @pytest.mark.asyncio
+    async def test_skip_on_failure(self):
+        config = self._make_config(["_mock_success", "_mock_fail", "_mock_success"],
+                                   step_failure="skip")
+        runner = PipelineRunner(config)
+        record = await runner.run("test")
+        assert len(record.step_results) == 3
+        assert record.step_results[0].status == "success"
+        assert record.step_results[1].status == "failed"
+        assert record.step_results[2].status == "success"
+        assert record.status == "failed"
+
+    @pytest.mark.asyncio
+    async def test_missing_pipeline_raises_keyerror(self):
+        config = AppConfig(scheduler=SchedulerConfig(pipelines={}))
+        runner = PipelineRunner(config)
+        with pytest.raises(KeyError):
+            await runner.run("nonexistent")
