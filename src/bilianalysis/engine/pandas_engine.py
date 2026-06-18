@@ -153,8 +153,8 @@ class PandasEngine(AnalysisEngine):
                 category_rows.append({
                     "tid": v.get("tid"),
                     "tname": v.get("tname"),
-                    "tid_v2": rcmd.get("tid_v2") if rcmd else None,
-                    "tname_v2": rcmd.get("tname_v2") if rcmd else None,
+                    "tid_v2": rcmd.get("tid_v2") if isinstance(rcmd, dict) else None,
+                    "tname_v2": rcmd.get("tname_v2") if isinstance(rcmd, dict) else None,
                 })
 
                 stat_rows.append({
