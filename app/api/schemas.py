@@ -1,6 +1,5 @@
 """API request/response models. Engine reports reused from bilianalysis.engine.base."""
 from datetime import datetime
-from typing import Literal
 
 from pydantic import BaseModel
 
@@ -63,6 +62,6 @@ class RunHistoryItem(BaseModel):
 # ── Config ──
 
 class ConfigUpdateRequest(BaseModel):
-    section: Literal["crawler", "analysis", "data", "scheduler"]
+    section: str
     values: dict
     persist: bool = False

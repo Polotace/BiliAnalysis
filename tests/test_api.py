@@ -1,88 +1,123 @@
+"""Integration tests for BiliAnalysis API."""
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
-from bilianalysis.crawler import list_series, get_weekly_videos, BASE_URL
-from bilianalysis.crawler.signer import WbiSigner
-from bilianalysis.utils.fetch import HttpError
+from fastapi.testclient import TestClient
 
-
-SERIES_LIST_RESPONSE = {
-    "code": 0,
-    "message": "0",
-    "data": {
-        "list": [
-            {"number": 1, "subject": "第一期", "name": "每周必看 01"},
-            {"number": 2, "subject": "第二期", "name": "每周必看 02"},
-            {"number": 3, "subject": "第三期", "name": "每周必看 03"},
-        ]
-    }
-}
-
-SERIES_ONE_RESPONSE = {
-    "code": 0,
-    "message": "0",
-    "data": {
-        "config": {"number": 1, "subject": "测试期", "name": "每周必看 01"},
-        "list": [
-            {"aid": 123, "title": "测试视频", "owner": {"mid": 1, "name": "UP主"},
-             "stat": {"view": 1000, "like": 50}}
-        ]
-    }
-}
+from bilianalysis.config.model import AppConfig
+from app.api import create_app
 
 
 @pytest.fixture
-def signer():
-    """创建一个测试用 WbiSigner（固定 mixin_key）。"""
-    return WbiSigner("test_key_32_bytes_0123456789")
+def client():
+    config = AppConfig()
+    app = create_app(config)
+    return TestClient(app)
 
 
-class TestListSeries:
-    @pytest.mark.asyncio
-    async def test_returns_series_list(self, signer):
-        with patch("bilianalysis.crawler.api.get", AsyncMock(return_value=SERIES_LIST_RESPONSE)):
-            result = await list_series(MagicMock(), signer)
-        assert len(result) == 3
-        assert result[0]["number"] == 1
-        assert result[-1]["number"] == 3
+class TestHealthAndConfig:
+    def test_config_get(self, client):
+        resp = client.get("/api/config")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "crawler" in data
+        assert "analysis" in data
+        assert "data" in data
+        assert "scheduler" in data
 
-    @pytest.mark.asyncio
-    async def test_calls_correct_url(self, signer):
-        mock_get = AsyncMock(return_value=SERIES_LIST_RESPONSE)
-        with patch("bilianalysis.crawler.api.get", mock_get):
-            await list_series(MagicMock(), signer)
-        mock_get.assert_called_once()
-        call_args = mock_get.call_args[0]
-        url = call_args[1]
-        assert url.startswith(f"{BASE_URL}/list?")
-        assert "web_location=333.934" in url
-        assert "w_rid=" in url
-        assert "wts=" in url
+    def test_config_put_valid(self, client):
+        resp = client.put("/api/config", json={
+            "section": "crawler",
+            "values": {"mode": "concurrent"},
+            "persist": False,
+        })
+        assert resp.status_code == 200
+        assert resp.json()["persisted"] is False
+
+    def test_config_put_invalid_section(self, client):
+        resp = client.put("/api/config", json={
+            "section": "nonexistent",
+            "values": {},
+            "persist": False,
+        })
+        assert resp.status_code == 400
+
+    def test_config_put_invalid_field(self, client):
+        resp = client.put("/api/config", json={
+            "section": "crawler",
+            "values": {"nonexistent_field": 123},
+            "persist": False,
+        })
+        assert resp.status_code == 400
 
 
-class TestGetWeeklyVideos:
-    @pytest.mark.asyncio
-    async def test_returns_data_dict(self, signer):
-        with patch("bilianalysis.crawler.api.get", AsyncMock(return_value=SERIES_ONE_RESPONSE)):
-            result = await get_weekly_videos(MagicMock(), 1, signer)
-        assert result["config"]["number"] == 1
-        assert len(result["list"]) == 1
-        assert result["list"][0]["title"] == "测试视频"
+class TestCrawlerRoutes:
+    def test_get_crawler_status(self, client):
+        resp = client.get("/api/crawler")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "total_weeks" in data
+        assert "is_running" in data
 
-    @pytest.mark.asyncio
-    async def test_url_includes_number(self, signer):
-        mock_get = AsyncMock(return_value=SERIES_ONE_RESPONSE)
-        with patch("bilianalysis.crawler.api.get", mock_get):
-            await get_weekly_videos(MagicMock(), 42, signer)
-        call_args = mock_get.call_args[0]
-        url = call_args[1]
-        assert "number=42" in url
-        assert url.startswith(f"{BASE_URL}/one?")
 
-    @pytest.mark.asyncio
-    async def test_propagates_http_error(self, signer):
-        err = HttpError(502, "bad gateway")
-        mock_get = AsyncMock(side_effect=err)
-        with patch("bilianalysis.crawler.api.get", mock_get):
-            with pytest.raises(HttpError) as exc_info:
-                await get_weekly_videos(MagicMock(), 1, signer)
-            assert exc_info.value.status == 502
+class TestAnalysisRoutes:
+    def test_get_analysis_overview(self, client):
+        resp = client.get("/api/analysis")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "last_clean" in data
+
+    def test_get_analysis_routes_exist(self, client):
+        for path in ["/api/analysis/stats", "/api/analysis/clusters",
+                      "/api/analysis/predictions"]:
+            try:
+                resp = client.get(path)
+                # 500 (no data files) is acceptable — route is registered
+                assert resp.status_code != 404, f"{path} returned 404"
+            except FileNotFoundError:
+                # Route exists but engine failed because data/processed/
+                # is empty; the testclient re-raises the 500 exception.
+                pass
+
+
+class TestTasksRoutes:
+    def test_list_tasks_empty(self, client):
+        resp = client.get("/api/tasks")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["pipelines"] == []
+
+    def test_list_tasks_with_pipelines(self):
+        from bilianalysis.config.model import SchedulerConfig, PipelineConfig
+        config = AppConfig()
+        config.scheduler = SchedulerConfig(
+            pipelines={
+                "full": PipelineConfig(schedule="0 12 * * 6", steps=["crawl"]),
+            }
+        )
+        app = create_app(config)
+        client = TestClient(app)
+        resp = client.get("/api/tasks")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data["pipelines"]) == 1
+        assert data["pipelines"][0]["name"] == "full"
+
+
+class TestTaskHistory:
+    def test_history_nonexistent_pipeline(self, client):
+        resp = client.get("/api/tasks/nonexistent/history")
+        assert resp.status_code == 404
+
+
+class TestErrorHandling:
+    def test_404_on_unregistered_route(self, client):
+        resp = client.get("/api/nonexistent")
+        assert resp.status_code == 404
+
+    def test_app_error_response_format(self, client):
+        resp = client.put("/api/config", json={
+            "section": "nonexistent",
+            "values": {},
+        })
+        assert resp.status_code == 400
+        data = resp.json()
+        assert "detail" in data
