@@ -22,16 +22,14 @@ WEEKLY_DATA = {
 class TestCrawlerSection:
     def test_defaults(self):
         config = CrawlerSection()
-        assert config.mode == "sequential"
-        assert config.concurrency == 3
         assert config.request_delay == 2.5
         assert config.max_retries == 3
         assert config.retry_delay == 1.0
 
     def test_override(self):
-        config = CrawlerSection(mode="concurrent", concurrency=5)
-        assert config.mode == "concurrent"
-        assert config.concurrency == 5
+        config = CrawlerSection(request_delay=5.0, max_retries=1)
+        assert config.request_delay == 5.0
+        assert config.max_retries == 1
 
 
 class TestCrawlReport:
@@ -66,7 +64,7 @@ class TestRun:
         with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
             with patch("bilianalysis.crawler.pipeline.list_series", mock_list_series):
                 with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                    config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
+                    config = CrawlerSection(request_delay=0, retry_delay=0)
                     report = await run(config)
 
         assert report.total == 3
@@ -89,7 +87,7 @@ class TestRun:
         with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
             with patch("bilianalysis.crawler.pipeline.list_series", mock_list_series):
                 with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                    config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
+                    config = CrawlerSection(request_delay=0, retry_delay=0)
                     report = await run(config)
 
         assert report.skipped == 2
@@ -113,7 +111,7 @@ class TestRun:
         with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
             with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
                 with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                    config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
+                    config = CrawlerSection(request_delay=0, retry_delay=0)
                     report = await run(config)
 
         assert report.crawled == 1  # only week 3
@@ -140,26 +138,9 @@ class TestRun:
         with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
             with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
                 with patch("bilianalysis.crawler.pipeline.get_weekly_videos", mock_get_weekly):
-                    config = CrawlerSection(mode="sequential", request_delay=0, retry_delay=0)
+                    config = CrawlerSection(request_delay=0, retry_delay=0)
                     report = await run(config)
 
         progress = await load_progress()
         assert 2 not in progress.failed
         assert 2 in progress.crawled
-
-    @pytest.mark.asyncio
-    async def test_concurrent_mode(self, tmp_path, monkeypatch, signer):
-        """并发模式正常完成"""
-        from bilianalysis.crawler import save_progress
-        monkeypatch.setattr("bilianalysis.crawler.storage.DATA_DIR", tmp_path)
-        await save_progress(ProgressFile())
-
-        mock_fetch_key = AsyncMock(return_value="test_key_32_bytes_0123456789")
-
-        with patch("bilianalysis.crawler.pipeline.fetch_mixin_key", mock_fetch_key):
-            with patch("bilianalysis.crawler.pipeline.list_series", AsyncMock(return_value=SERIES_LIST)):
-                with patch("bilianalysis.crawler.pipeline.get_weekly_videos", AsyncMock(return_value=WEEKLY_DATA)):
-                    config = CrawlerSection(mode="concurrent", concurrency=3, retry_delay=0)
-                    report = await run(config)
-
-        assert report.crawled == 3

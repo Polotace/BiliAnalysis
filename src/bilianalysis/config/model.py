@@ -5,8 +5,6 @@ from typing import Literal
 
 class CrawlerSection(BaseModel):
     """爬虫配置节"""
-    mode: Literal["sequential", "concurrent"] = "sequential"
-    concurrency: int = 3
     request_delay: float = 2.5
     max_retries: int = 3
     retry_delay: float = 1.0

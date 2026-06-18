@@ -3,7 +3,6 @@ import asyncio
 import datetime
 import random
 import time
-from typing import Literal
 
 from pydantic import BaseModel
 import aiohttp
@@ -158,33 +157,15 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
                 failed_count += 1
                 failed_details[number] = err_msg
 
-        # 4. 处理新期号
-        if config.mode == "sequential":
-            for number in pending_list:
-                success, err_msg = await _crawl_with_rotation(number)
-                if success:
-                    crawled_count += 1
-                else:
-                    failed_count += 1
-                    failed_details[number] = err_msg
-                await asyncio.sleep(_jitter(config.request_delay))
-        else:
-            semaphore = asyncio.Semaphore(config.concurrency)
-
-            async def crawl_with_semaphore(number: int):
-                async with semaphore:
-                    success, err_msg = await _crawl_with_rotation(number)
-                    return number, success, err_msg
-
-            results = await asyncio.gather(
-                *(crawl_with_semaphore(n) for n in pending_list)
-            )
-            for number, success, err_msg in results:
-                if success:
-                    crawled_count += 1
-                else:
-                    failed_count += 1
-                    failed_details[number] = err_msg
+        # 4. 顺序处理新期号
+        for number in pending_list:
+            success, err_msg = await _crawl_with_rotation(number)
+            if success:
+                crawled_count += 1
+            else:
+                failed_count += 1
+                failed_details[number] = err_msg
+            await asyncio.sleep(_jitter(config.request_delay))
 
         # 5. 更新最后运行时间
         progress = await load_progress()

@@ -26,7 +26,7 @@ class TestHealthAndConfig:
     def test_config_put_valid(self, client):
         resp = client.put("/api/config", json={
             "section": "crawler",
-            "values": {"mode": "concurrent"},
+            "values": {"request_delay": 5.0},
             "persist": False,
         })
         assert resp.status_code == 200
