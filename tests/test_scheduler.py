@@ -216,3 +216,53 @@ class TestPipelineRunner:
         runner = PipelineRunner(config)
         with pytest.raises(KeyError):
             await runner.run("nonexistent")
+
+
+from unittest.mock import AsyncMock, patch
+
+
+class TestBuiltinTasks:
+    def setup_method(self):
+        clear_registry()
+
+    def teardown_method(self):
+        clear_registry()
+
+    @pytest.mark.asyncio
+    async def test_crawl_task_success(self):
+        from bilianalysis.scheduler.builtins.crawl_task import CrawlTask
+        from bilianalysis.crawler import CrawlReport
+
+        task = CrawlTask()
+        ctx = TaskContext(
+            config=AppConfig(scheduler=SchedulerConfig(pipelines={})),
+        )
+
+        mock_report = CrawlReport(
+            total=50, crawled=3, skipped=47, failed=0,
+            failed_weeks={}, duration_seconds=2.5,
+        )
+        with patch("bilianalysis.crawler.CrawlRunner",
+                   new_callable=AsyncMock) as mock_runner:
+            mock_runner.return_value = mock_report
+            result = await task.run(ctx)
+
+        assert result.status == "success"
+        assert result.output["crawled"] == 3
+        assert result.output["skipped"] == 47
+
+    @pytest.mark.asyncio
+    async def test_crawl_task_failure(self):
+        from bilianalysis.scheduler.builtins.crawl_task import CrawlTask
+
+        task = CrawlTask()
+        ctx = TaskContext(
+            config=AppConfig(scheduler=SchedulerConfig(pipelines={})),
+        )
+        with patch("bilianalysis.crawler.CrawlRunner",
+                   new_callable=AsyncMock) as mock_runner:
+            mock_runner.side_effect = RuntimeError("network error")
+            result = await task.run(ctx)
+
+        assert result.status == "failed"
+        assert "network error" in result.error
