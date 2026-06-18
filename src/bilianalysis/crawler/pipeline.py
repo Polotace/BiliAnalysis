@@ -170,27 +170,31 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
         except BiliCodeError as e:
             last_error = str(e)
             reqs_this_week += 1
-            # -352: WBI key expired, -403: forbidden, -401: unauthorized
-            if e.bili_code in (-352, -403, -401):
-                print(f"  ⚠ Week #{number}: WBI key expired (code={e.bili_code}), refreshing key…")
-                new_key = await mixin_refresher(session)
-                signer._key = new_key
-            # -412: rate limited — exponential backoff
-            elif e.bili_code == -412:
-                print(f"  ⏳ Week #{number}: rate limited (412), "
+            # -352: rate limited — exponential backoff
+            if e.bili_code == -352:
+                print(f"  ⏳ Week #{number}: rate limited (code=-352), "
                       f"backing off {delay:.1f}s → {min(delay * 2, 60.0):.1f}s")
                 delay = min(delay * 2, 60.0)  # cap at 60s
+            # -403 / -401: auth failure → refresh WBI key
+            elif e.bili_code in (-403, -401):
+                print(f"  ⚠ Week #{number}: auth failure (code={e.bili_code}), refreshing key…")
+                new_key = await mixin_refresher(session)
+                signer._key = new_key
+            else:
+                print(f"  ⚠ Week #{number}: Bilibili code={e.bili_code}, retrying…")
             if attempt < retries:
                 await asyncio.sleep(_jitter(delay))
             continue
         except HttpError as e:
             last_error = str(e)
             reqs_this_week += 1
-            # HTTP 412: rate limited
+            # HTTP 412: 触发风控 → 激进退避 + 刷新密钥
             if "412" in last_error:
-                print(f"  ⏳ Week #{number}: HTTP 412 rate limit, "
-                      f"backing off {delay:.1f}s → {min(delay * 2, 60.0):.1f}s")
-                delay = min(delay * 2, 60.0)
+                print(f"  🛡 Week #{number}: risk control triggered (HTTP 412), "
+                      f"refreshing key + backing off {delay:.1f}s → {min(delay * 3, 120.0):.1f}s")
+                new_key = await mixin_refresher(session)
+                signer._key = new_key
+                delay = min(delay * 3, 120.0)  # 风控退避更激进，上限 120s
             # Auth-related HTTP errors → refresh WBI key
             elif "403" in last_error or "401" in last_error:
                 print(f"  ⚠ Week #{number}: HTTP {e.status}, refreshing WBI key…")
