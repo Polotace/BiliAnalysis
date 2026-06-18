@@ -40,6 +40,7 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
     session = create_session()
     mixin_key = await fetch_mixin_key(session)
     signer = WbiSigner(mixin_key)
+    refresher = lambda s: fetch_mixin_key(s)
     try:
         # 1. 获取所有期号
         series = await list_series(session, signer)
@@ -48,43 +49,34 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
                 total=0, crawled=0, skipped=0, failed=0,
                 failed_weeks={}, duration_seconds=time.monotonic() - start_time
             )
-        existing = {s["number"] for s in series}
-        latest = max(existing)
-        total = len(existing)
+        latest = max(s["number"] for s in series)
+        total = latest
 
-        # 2. 获取待爬列表（只爬真实存在的期号）
+        # 2. 获取待爬列表
         retry_list, pending_list = await get_pending_weeks(latest)
-        retry_list = [n for n in retry_list if n in existing]
-        pending_list = [n for n in pending_list if n in existing]
 
-        # 计算已跳过数（之前已成功爬取的，只算真实存在的期号）
+        # 计算已跳过数（之前已成功爬取的）
         progress = await load_progress()
-        already_crawled = set(progress.crawled) & existing
-        failed_set = set(int(k) for k in progress.failed.keys()) & existing
+        already_crawled = set(progress.crawled)
+        failed_set = set(int(k) for k in progress.failed.keys())
         already_done = already_crawled - failed_set
         skipped_count = len(already_done)
 
-        # 3. 先处理历史失败期号（每个仅尝试 1 次）
+        # 3. 先处理历史失败期号（用 _crawl_one 复用空响应检测 + 密钥刷新）
         for number in retry_list:
-            try:
-                data = await get_weekly_videos(session, number, signer)
-            except HttpError as e:
-                progress.failed[number] = str(e)
+            success, err_msg = await _crawl_one(session, number, config,
+                                                 signer, refresher, max_retries=1)
+            if success:
+                crawled_count += 1
+            else:
                 failed_count += 1
-                failed_details[number] = str(e)
-                continue
-            await save_week(number, {"number": number, "config": data.get("config", {}),
-                                     "videos": data.get("list", [])})
-            progress.failed.pop(number, None)
-            if number not in progress.crawled:
-                progress.crawled.append(number)
-            crawled_count += 1
-        await save_progress(progress)
+                failed_details[number] = err_msg
 
         # 4. 处理新期号
         if config.mode == "sequential":
             for number in pending_list:
-                success, err_msg = await _crawl_one(session, number, config, signer)
+                success, err_msg = await _crawl_one(session, number, config,
+                                                     signer, refresher)
                 if success:
                     crawled_count += 1
                 else:
@@ -96,7 +88,8 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
 
             async def crawl_with_semaphore(number: int):
                 async with semaphore:
-                    success, err_msg = await _crawl_one(session, number, config, signer)
+                    success, err_msg = await _crawl_one(session, number, config,
+                                                         signer, refresher)
                     return number, success, err_msg
 
             results = await asyncio.gather(
@@ -128,15 +121,32 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
 
 
 async def _crawl_one(session: aiohttp.ClientSession, number: int,
-                     config: CrawlerSection, signer: WbiSigner) -> tuple[bool, str]:
-    """爬取单期，含重试逻辑。返回 (成功, 错误信息)。"""
+                     config: CrawlerSection, signer: WbiSigner,
+                     mixin_refresher,
+                     max_retries: int | None = None) -> tuple[bool, str]:
+    """爬取单期，含重试逻辑和 WBI 密钥自动刷新。返回 (成功, 错误信息)。"""
+    retries = max_retries if max_retries is not None else config.max_retries
     last_error = ""
-    for attempt in range(1, config.max_retries + 1):
+    for attempt in range(1, retries + 1):
         try:
             data = await get_weekly_videos(session, number, signer)
         except HttpError as e:
             last_error = str(e)
-            if attempt < config.max_retries:
+            # 空响应或鉴权失败 → 刷新 WBI 密钥
+            if ("empty" in last_error or "-403" in last_error or
+                "-401" in last_error or "-352" in last_error):
+                new_key = await mixin_refresher(session)
+                signer._key = new_key
+            if attempt < retries:
+                await asyncio.sleep(_jitter(config.retry_delay))
+            continue
+
+        # 成功前检测空响应
+        if not data.get("list") and not data.get("config"):
+            last_error = "HTTP 200: empty response"
+            new_key = await mixin_refresher(session)
+            signer._key = new_key
+            if attempt < retries:
                 await asyncio.sleep(_jitter(config.retry_delay))
             continue
 
