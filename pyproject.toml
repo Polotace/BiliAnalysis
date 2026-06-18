@@ -6,7 +6,6 @@ dependencies = [
     "aiohttp>=3.14.1",
     "fake-useragent>=2.2.0",
     "hdfs>=2.7.3",
-    "httpx2>=2.4.0",
     "numpy>=2.4.6",
     "pandas>=3.0.3",
     "pyarrow>=24.0.0",
