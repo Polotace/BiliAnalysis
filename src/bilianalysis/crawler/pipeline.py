@@ -56,7 +56,7 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
 
     async def _maybe_rotate_on_rate_limit():
         """连续 -352 超阈值 → 换 session（新设备指纹），重置 IP 维度的限流压力。"""
-        nonlocal session
+        nonlocal session, signer
         rotate_threshold = 3
         async with rate_limit["lock"]:
             rate_limit["hits_since_rotate"] += 1
@@ -139,6 +139,7 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
                 session, number, config, signer, refresher,
                 current_delay, max_retries=max_retries,
                 on_rate_hit=_on_rate_hit, on_success=_on_success,
+                on_rate_rotate=_maybe_rotate_on_rate_limit,
             )
             request_count += reqs
             if success:
@@ -205,7 +206,8 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
                      config: CrawlerSection, signer: WbiSigner,
                      mixin_refresher, retry_delay: float,
                      max_retries: int | None = None,
-                     on_rate_hit=None, on_success=None) -> tuple[bool, str, int]:
+                     on_rate_hit=None, on_success=None,
+                     on_rate_rotate=None) -> tuple[bool, str, int]:
     """爬取单期，含重试 + WBI 刷新 + 全局限流退避。
     返回 (成功, 错误信息, 本次尝试的请求数)。"""
     retries = max_retries if max_retries is not None else config.max_retries
@@ -224,7 +226,8 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
                 if on_rate_hit:
                     await on_rate_hit(f"Week #{number} rate limited (code=-352)",
                                      multiplier=2.0, cap=60.0)
-                await _maybe_rotate_on_rate_limit()
+                if on_rate_rotate:
+                    await on_rate_rotate()
             elif e.bili_code in (-403, -401):
                 print(f"  ⚠ Week #{number}: auth failure (code={e.bili_code}), refreshing key…")
                 new_key = await mixin_refresher(session)
