@@ -1,0 +1,33 @@
+# BiliAnalysis 配置样例
+# 用法: 复制为 config.yaml，修改后使用
+# 所有字段均有默认值，可全部省略
+
+# ── 爬虫 ──
+crawler:
+  mode: sequential           # sequential | concurrent
+  concurrency: 3             # 并发模式下的最大并发数
+  request_delay: 2.5         # 请求间隔（秒），含 ±1s 随机抖动
+  max_retries: 3             # 单周最大重试次数
+  retry_delay: 1.0           # 重试间隔（秒）
+
+# ── 分析引擎 ──
+analysis:
+  engine: pandas             # pandas | spark
+
+# ── 数据路径 ──
+data:
+  raw_dir: data/raw          # 爬取原始 JSON
+  processed_dir: data/processed  # 清洗后 Parquet
+  reports_dir: data/reports  # 分析结果 JSON
+
+# ── 定时调度 (可选) ──
+scheduler:
+  pipelines:
+    crawl:
+      schedule: "0 9 * * 1"       # 每周一早9点
+      steps: [crawl]
+      step_failure: stop
+    analysis:
+      schedule: ""                 # 空字符串 = 仅手动触发
+      steps: [clean_data, stats, cluster, predict]
+      step_failure: stop
