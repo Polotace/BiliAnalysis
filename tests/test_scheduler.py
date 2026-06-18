@@ -320,3 +320,59 @@ class TestCronService:
         client = TestClient(app)
         resp = client.post("/pipelines/nonexistent/run")
         assert resp.status_code == 404
+
+
+from typer.testing import CliRunner
+from app.cli import app as cli_app
+import sys
+
+
+class TestCLI:
+    def setup_method(self):
+        """Re-register builtin tasks after prior tests may have cleared the registry."""
+        from bilianalysis.scheduler.registry import clear_registry
+        clear_registry()
+        for mod_name in list(sys.modules):
+            if mod_name.startswith("bilianalysis.scheduler.builtins"):
+                del sys.modules[mod_name]
+        import bilianalysis.scheduler.builtins  # noqa: F401
+
+    def test_list_command_outputs_tasks(self):
+        runner = CliRunner()
+        result = runner.invoke(cli_app, ["schedule", "list"])
+        assert result.exit_code == 0
+        assert "crawl" in result.stdout
+        assert "statistics" in result.stdout
+
+    def test_test_command_valid_pipeline(self, tmp_path):
+        import yaml
+        config_path = tmp_path / "config.yaml"
+        config_data = {
+            "scheduler": {
+                "pipelines": {
+                    "full": {"steps": ["crawl", "statistics"]}
+                }
+            }
+        }
+        config_path.write_text(yaml.dump(config_data))
+        runner = CliRunner()
+        result = runner.invoke(cli_app, ["schedule", "test", "--pipeline", "full",
+                                          "--config", str(config_path)])
+        assert result.exit_code == 0
+        assert "All 2 steps valid" in result.stdout
+
+    def test_test_command_invalid_step(self, tmp_path):
+        import yaml
+        config_path = tmp_path / "config.yaml"
+        config_data = {
+            "scheduler": {
+                "pipelines": {
+                    "bad": {"steps": ["nonexistent_task"]}
+                }
+            }
+        }
+        config_path.write_text(yaml.dump(config_data))
+        runner = CliRunner()
+        result = runner.invoke(cli_app, ["schedule", "test", "--pipeline", "bad",
+                                          "--config", str(config_path)])
+        assert result.exit_code == 1
