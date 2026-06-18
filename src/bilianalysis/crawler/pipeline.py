@@ -48,16 +48,19 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
                 total=0, crawled=0, skipped=0, failed=0,
                 failed_weeks={}, duration_seconds=time.monotonic() - start_time
             )
-        latest = max(s["number"] for s in series)
-        total = latest
+        existing = {s["number"] for s in series}
+        latest = max(existing)
+        total = len(existing)
 
-        # 2. 获取待爬列表
+        # 2. 获取待爬列表（只爬真实存在的期号）
         retry_list, pending_list = await get_pending_weeks(latest)
+        retry_list = [n for n in retry_list if n in existing]
+        pending_list = [n for n in pending_list if n in existing]
 
-        # 计算已跳过数（之前已成功爬取的）
+        # 计算已跳过数（之前已成功爬取的，只算真实存在的期号）
         progress = await load_progress()
-        already_crawled = set(progress.crawled)
-        failed_set = set(int(k) for k in progress.failed.keys())
+        already_crawled = set(progress.crawled) & existing
+        failed_set = set(int(k) for k in progress.failed.keys()) & existing
         already_done = already_crawled - failed_set
         skipped_count = len(already_done)
 
