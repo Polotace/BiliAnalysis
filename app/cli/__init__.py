@@ -12,3 +12,6 @@ def _register_schedule():
 
 
 _register_schedule()
+
+from app.cli.serve_cmd import serve_app
+app.add_typer(serve_app, name="serve", help="Start API server")

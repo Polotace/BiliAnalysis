@@ -41,6 +41,7 @@ packages = ["src/bilianalysis", "app"]
 
 [project.scripts]
 bilianalysis = "app.cli:app"
+bilianalysis-serve = "app.cli.serve_cmd:serve"
 
 [build-system]
 requires = ["hatchling"]
