@@ -269,15 +269,28 @@ class TestBuiltinTasks:
 
 
 from bilianalysis.scheduler.cron_service import CronService
+from app.api import create_scheduler_app
 
 
 class TestCronService:
-    @pytest.mark.asyncio
-    async def test_create_app_returns_fastapi(self):
+    def test_history_starts_empty(self):
         config = AppConfig(scheduler=SchedulerConfig(pipelines={}))
         service = CronService(config)
-        app = service.create_app()
-        assert app.title == "BiliAnalysis Scheduler"
+        assert service.history == []
+
+    def test_setup_schedule_no_pipelines(self):
+        config = AppConfig(scheduler=SchedulerConfig(pipelines={}))
+        service = CronService(config)
+        service.setup_schedule()  # should not raise
+
+    def test_stop_cleanup(self):
+        config = AppConfig(scheduler=SchedulerConfig(pipelines={}))
+        service = CronService(config)
+        service.stop()  # should not raise
+
+
+class TestSchedulerAPI:
+    """FastAPI layer tests — uses app.api.create_scheduler_app()."""
 
     @pytest.mark.asyncio
     async def test_health_endpoint(self):
@@ -287,11 +300,12 @@ class TestCronService:
             pipelines={"full": PipelineConfig(steps=["crawl"])}
         ))
         service = CronService(config)
-        app = service.create_app()
+        app = create_scheduler_app(service)
         client = TestClient(app)
         resp = client.get("/health")
         assert resp.status_code == 200
         assert resp.json()["status"] == "ok"
+        assert "full" in resp.json()["pipelines"]
 
     @pytest.mark.asyncio
     async def test_list_pipelines(self):
@@ -303,7 +317,7 @@ class TestCronService:
             }
         ))
         service = CronService(config)
-        app = service.create_app()
+        app = create_scheduler_app(service)
         client = TestClient(app)
         resp = client.get("/pipelines")
         assert resp.status_code == 200
@@ -316,7 +330,7 @@ class TestCronService:
 
         config = AppConfig(scheduler=SchedulerConfig(pipelines={}))
         service = CronService(config)
-        app = service.create_app()
+        app = create_scheduler_app(service)
         client = TestClient(app)
         resp = client.post("/pipelines/nonexistent/run")
         assert resp.status_code == 404

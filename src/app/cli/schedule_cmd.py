@@ -99,14 +99,24 @@ def serve_cmd(
     config_path: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
 ):
     """Start the scheduler daemon (cron + HTTP API)."""
+    import uvicorn
+    from app.api import create_scheduler_app
+
     config = load_config(config_path)
     console.print(make_serve_banner(config))
     console.print(f"\n  API:   [cyan]http://127.0.0.1:{port}[/cyan]")
     console.print(f"  Docs:  [cyan]http://127.0.0.1:{port}/docs[/cyan]\n")
 
     service = CronService(config)
+    service.setup_schedule()
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    service.start_scheduler(loop)
+
+    app = create_scheduler_app(service)
     try:
-        service.start(port=port)
+        uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
     except KeyboardInterrupt:
         console.print("\n[yellow]Shutting down...[/yellow]")
         service.stop()
