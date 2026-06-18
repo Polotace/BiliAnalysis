@@ -64,12 +64,12 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
         if should_rotate:
             print(f"  🔄 Session rotation (hit {rotate_threshold}+ rate limits, "
                   f"new device ID → may reset IP-level counter)")
-            await session.close()
-            session = create_session(cookie=config.cookie)
-            signer._key = await refresher(session)  # 新 session 也刷新 key
+            # 创建新 session（不关旧的——并发请求可能还在用）
             async with rate_limit["lock"]:
+                session = create_session(cookie=config.cookie)
+                signer._key = await refresher(session)
                 rate_limit["hits_since_rotate"] = 0
-                rate_limit["delay"] = config.retry_delay  # 重置延迟
+                rate_limit["delay"] = config.retry_delay
 
     async def _on_rate_hit(msg: str, multiplier: float = 2.0, cap: float = 60.0):
         """全局限流命中：所有 worker 统一退避 + 连续命中换 session。"""
