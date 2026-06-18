@@ -34,18 +34,3 @@ async def get_weekly_videos(
     resp = await get(session, url)
     return resp.get("data", {})
 
-
-if __name__ == '__main__':
-    import asyncio
-    from bilianalysis.crawler.signer import fetch_mixin_key, WbiSigner
-    async def main():
-        session = aiohttp.ClientSession()
-        mixin_key = await fetch_mixin_key(session)
-        signer = WbiSigner(mixin_key)
-        series = await list_series(session, signer)
-        print(series)
-        if series:
-            data = await get_weekly_videos(session, series[0]["number"], signer)
-            print(data)
-        await session.close()
-    asyncio.run(main())

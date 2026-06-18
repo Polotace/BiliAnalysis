@@ -17,11 +17,11 @@ from app.cli.utils import (
 schedule_app = typer.Typer(name="schedule", help="Scheduler management")
 
 _TASK_DESCRIPTIONS = {
-    "crawl": "Crawl Bilibili weekly must-watch data",
-    "clean_data": "Clean data -> 5 Parquet tables",
-    "statistics": "Statistical analysis (overall/category/creator/weekly)",
-    "clustering": "KMeans clustering (k=3)",
-    "prediction": "Linear regression prediction (views/likes)",
+    "crawl": "爬取Bilibili每周必看数据",
+    "clean_data": "清洗数据-> 5个Parquet表",
+    "statistics": "统计分析（整体/类别/创作者/周报）",
+    "clustering": "KMeans聚类（k=3）",
+    "prediction": "线性回归预测（观看数/点赞数）",
 }
 
 

@@ -1,2 +1,5 @@
 node_modules/
 dist/
+test-results
+e2e/visual.spec.ts-snapshots
+*.tsbuildinfo

@@ -19,3 +19,4 @@ __pycache__/
 dist/
 build/
 .superpowers/
+skills-lock.json
