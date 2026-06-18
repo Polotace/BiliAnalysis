@@ -1,5 +1,6 @@
 """WBI 签名模块：fetch_mixin_key + WbiSigner。"""
 import hashlib
+import random
 import time
 from typing import Any
 from urllib.parse import urlencode
@@ -12,7 +13,9 @@ MIXIN_TABLE = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35,
                37, 48, 7, 16, 24, 55, 40, 61, 26, 17, 0, 1, 60, 51, 30, 4,
                22, 25, 54, 21, 56, 59, 6, 63, 57, 62, 11, 36, 20, 52, 44, 34]
 
-WEB_LOCATION = "333.934"
+# web_location 变体池（B站不同页面的位置标识）
+_WEB_LOCATIONS = ["333.934", "333.933", "333.935", "333.999"]
+WEB_LOCATION = "333.934"  # 默认值，实际 sign 时随机选取
 NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
 BILI_HEADER = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
@@ -56,8 +59,8 @@ class WbiSigner:
     def sign(self, params: dict[str, Any]) -> dict[str, Any]:
         """对参数追加 wts + web_location + w_rid 后返回完整参数字典。"""
         signed: dict[str, Any] = dict(params)
-        signed["wts"] = str(int(time.time()))
-        signed["web_location"] = WEB_LOCATION
+        signed["wts"] = str(int(time.time() * 1000) % 0xFFFFFFFF)  # 毫秒级，更真实
+        signed["web_location"] = random.choice(_WEB_LOCATIONS)
         signed["w_rid"] = self._compute_wrid(signed)
         return signed
 

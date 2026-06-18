@@ -1,10 +1,13 @@
 """异步 HTTP 工具模块。函数式设计，Session 由调用方显式管理。"""
 import random
+import string
+import time
 from typing import Any
 import aiohttp
 from .ua import ua
 
-__all__ = ["HttpError", "BiliCodeError", "create_session", "get", "post"]
+__all__ = ["HttpError", "BiliCodeError", "create_session", "get", "post",
+           "make_device_cookie"]
 
 DEFAULT_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=3)
 
@@ -37,32 +40,60 @@ class BiliCodeError(HttpError):
         super().__init__(status, f"code={bili_code} {message}")
 
 
+def make_device_cookie() -> str:
+    """生成模拟真机首次访问 B站的设备指纹 Cookie。
+    包含 buvid3（32位 hex）、buvid4（36位 UUID）、b_lsid（会话 ID）。
+    每次调用生成一个新设备身份。"""
+    buvid3 = ''.join(random.choices(string.hexdigits.lower(), k=32))
+    buvid4 = '-'.join([
+        ''.join(random.choices(string.hexdigits.lower(), k=8)),
+        ''.join(random.choices(string.hexdigits.lower(), k=4)),
+        ''.join(random.choices(string.hexdigits.lower(), k=4)),
+        ''.join(random.choices(string.hexdigits.lower(), k=4)),
+        ''.join(random.choices(string.hexdigits.lower(), k=12)),
+    ])
+    blsid = ''.join(random.choices(string.hexdigits.lower(), k=16))
+    # 模拟首次访问的时间戳
+    ts = int(time.time())
+    return (
+        f"buvid3={buvid3}; buvid4={buvid4}; b_lsid={blsid}; "
+        f"b_nut={ts}; _uuid={buvid4.upper()}-infoc"
+    )
+
+
 def _random_headers(cookie: str = "") -> dict[str, str]:
     """生成带随机 Referer + Accept-Language 的请求头。"""
-    return {
+    h = {
         "User-Agent": ua.random,
         "Referer": random.choice(_REFERERS),
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": random.choice(_ACCEPT_LANGUAGES),
-        **({"Cookie": cookie} if cookie else {}),
     }
+    if cookie:
+        h["Cookie"] = cookie
+    return h
 
 
 def create_session(
     timeout: aiohttp.ClientTimeout | None = None,
     cookie: str = "",
 ) -> aiohttp.ClientSession:
-    """创建预配置 Session：随机 UA + Referer + Accept-Language + 可选 Cookie。"""
+    """创建预配置 Session：设备指纹 Cookie + 随机 UA + Referer + Accept-Language。"""
+    device = make_device_cookie()
+    full_cookie = f"{device}; {cookie}" if cookie else device
     return aiohttp.ClientSession(
-        headers=_random_headers(cookie),
+        headers=_random_headers(full_cookie),
         timeout=timeout or DEFAULT_TIMEOUT,
+        cookie_jar=aiohttp.CookieJar(),  # 接受服务端 set-cookie（如果有）
     )
 
 
 def rotate_session_headers(session: aiohttp.ClientSession, cookie: str = "") -> None:
-    """轮换 Session 的请求头（模拟新会话指纹）。"""
+    """轮换 Session 的请求头（更换设备指纹 + UA + Referer）。"""
+    device = make_device_cookie()
+    full_cookie = f"{device}; {cookie}" if cookie else device
     session.headers.clear()
-    session.headers.update(_random_headers(cookie))
+    session.headers.update(_random_headers(full_cookie))
 
 
 async def _request(

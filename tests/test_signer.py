@@ -56,7 +56,9 @@ class TestWbiSigner:
         assert "wts" in result
         assert "web_location" in result
         assert "w_rid" in result
-        assert result["web_location"] == WEB_LOCATION
+        # web_location 应为有效变体之一
+        from bilianalysis.crawler.signer import _WEB_LOCATIONS
+        assert result["web_location"] in _WEB_LOCATIONS
         assert len(result["w_rid"]) == 32  # MD5 hex
 
     def test_sign_preserves_input_params(self):
@@ -65,15 +67,18 @@ class TestWbiSigner:
         assert result.get("number") == "123"
 
     def test_sign_deterministic_with_fixed_time(self, monkeypatch):
-        """固定时间戳时，签名是确定性的。"""
+        """固定时间戳和 location 时，签名是确定性的。"""
         import bilianalysis.crawler.signer as mod
         monkeypatch.setattr(mod.time, "time", lambda: 1781522463)
+        monkeypatch.setattr(mod.random, "choice", lambda xs: "333.934")
         signer = WbiSigner("test_key_32_bytes_123456789")
         result = signer.sign({"number": "377"})
 
-        assert result["wts"] == "1781522463"
-        # sorted: number=377, web_location=333.934, wts=1781522463
-        qs = "number=377&web_location=333.934&wts=1781522463"
+        # wts = int(1781522463 * 1000) % 0xFFFFFFFF = 1781522463000 % 4294967295
+        expected_wts = str(int(1781522463000) % 0xFFFFFFFF)
+        assert result["wts"] == expected_wts
+        # sorted: number=377, web_location=333.934, wts=...
+        qs = f"number=377&web_location=333.934&wts={expected_wts}"
         expected_wrid = hashlib.md5((qs + "test_key_32_bytes_123456789").encode()).hexdigest()
         assert result["w_rid"] == expected_wrid
 
@@ -81,11 +86,12 @@ class TestWbiSigner:
         """验证参数按 key 字母序排列。"""
         import bilianalysis.crawler.signer as mod
         monkeypatch.setattr(mod.time, "time", lambda: 1781522463)
+        monkeypatch.setattr(mod.random, "choice", lambda xs: "333.934")
         signer = WbiSigner("x" * 32)
 
         # 传入非字母序的参数，内部应重新排序
         result = signer.sign({"z_param": "1", "a_param": "2"})
-        # w_rid 的计算应该基于排序后的 query string
-        qs = "a_param=2&web_location=333.934&wts=1781522463&z_param=1"
+        expected_wts = str(int(1781522463000) % 0xFFFFFFFF)
+        qs = f"a_param=2&web_location=333.934&wts={expected_wts}&z_param=1"
         expected = hashlib.md5((qs + "x" * 32).encode()).hexdigest()
         assert result["w_rid"] == expected
