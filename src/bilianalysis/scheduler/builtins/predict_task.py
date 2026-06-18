@@ -1,5 +1,7 @@
 """回归预测 Task。"""
+import json
 import time
+from pathlib import Path
 
 from bilianalysis.scheduler.task import Task, TaskResult, TaskContext
 from bilianalysis.scheduler.registry import register
@@ -13,6 +15,10 @@ class PredictionTask(Task):
         start = time.monotonic()
         try:
             report = ctx.engine.prediction()
+            rd = Path(ctx.config.data.reports_dir)
+            rd.mkdir(parents=True, exist_ok=True)
+            (rd / "prediction_report.json").write_text(
+                report.model_dump_json(indent=2), encoding="utf-8")
             return TaskResult(
                 task_name="prediction", status="success",
                 duration_seconds=round(time.monotonic() - start, 2),

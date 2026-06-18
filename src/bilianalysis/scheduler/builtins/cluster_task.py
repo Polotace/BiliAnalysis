@@ -1,5 +1,7 @@
 """聚类分析 Task。"""
+import json
 import time
+from pathlib import Path
 
 from bilianalysis.scheduler.task import Task, TaskResult, TaskContext
 from bilianalysis.scheduler.registry import register
@@ -13,6 +15,10 @@ class ClusteringTask(Task):
         start = time.monotonic()
         try:
             report = ctx.engine.clustering()
+            rd = Path(ctx.config.data.reports_dir)
+            rd.mkdir(parents=True, exist_ok=True)
+            (rd / "cluster_report.json").write_text(
+                report.model_dump_json(indent=2), encoding="utf-8")
             return TaskResult(
                 task_name="clustering", status="success",
                 duration_seconds=round(time.monotonic() - start, 2),
