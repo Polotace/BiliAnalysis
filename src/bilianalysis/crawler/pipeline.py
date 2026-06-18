@@ -45,7 +45,34 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
     signer = WbiSigner(mixin_key)
     refresher = lambda s: fetch_mixin_key(s, cookie=cookie)
     request_count = 0  # 跟踪已发送请求数，用于主动密钥刷新和 session 轮换
-    retry_delay_acc = config.retry_delay  # 指数退避的动态延迟
+
+    # ── 全局共享限流状态（所有并发请求统一退避）──
+    rate_limit = {
+        "delay": config.retry_delay,  # 所有 worker 共用
+        "lock": asyncio.Lock(),
+        "cool_until": 0.0,
+    }
+
+    async def _on_rate_hit(msg: str, multiplier: float = 2.0, cap: float = 60.0):
+        """全局限流命中：所有 worker 统一退避。"""
+        async with rate_limit["lock"]:
+            rate_limit["delay"] = min(rate_limit["delay"] * multiplier, cap)
+            rate_limit["cool_until"] = time.monotonic() + rate_limit["delay"]
+            print(f"  ⏳ {msg}, global delay now {rate_limit['delay']:.1f}s")
+
+    async def _on_success():
+        """成功后逐步恢复延迟。"""
+        async with rate_limit["lock"]:
+            rate_limit["delay"] = max(config.retry_delay, rate_limit["delay"] * 0.85)
+
+    async def _wait_if_cooling():
+        """如果需要冷却，等待冷却结束。"""
+        while True:
+            async with rate_limit["lock"]:
+                remaining = rate_limit["cool_until"] - time.monotonic()
+            if remaining <= 0:
+                break
+            await asyncio.sleep(max(remaining, 0.5))
     try:
         # 1. 获取所有期号
         series = await list_series(session, signer)
@@ -68,9 +95,12 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
         already_done = already_crawled - failed_set
         skipped_count = len(already_done)
 
-        # 2.5. 包装器：处理请求计数 + 主动刷新 + Session 轮换
+        # 2.5. 包装器：处理请求计数 + 全局限流 + 主动刷新 + Session 轮换
         async def _crawl_with_rotation(number: int, max_retries: int | None = None) -> tuple[bool, str]:
-            nonlocal session, signer, request_count, retry_delay_acc
+            nonlocal session, signer, request_count
+
+            # 全局冷却等待
+            await _wait_if_cooling()
 
             # 主动刷新 WBI 密钥（到达间隔阈值）
             if config.key_refresh_interval > 0 and request_count > 0 \
@@ -85,15 +115,16 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
                 await session.close()
                 session = create_session(cookie=config.cookie)
 
+            async with rate_limit["lock"]:
+                current_delay = rate_limit["delay"]
             success, err_msg, reqs = await _crawl_one(
                 session, number, config, signer, refresher,
-                retry_delay_acc, max_retries=max_retries,
+                current_delay, max_retries=max_retries,
+                on_rate_hit=_on_rate_hit, on_success=_on_success,
             )
             request_count += reqs
             if success:
-                retry_delay_acc = config.retry_delay  # 重置退避
-            else:
-                retry_delay_acc = min(retry_delay_acc * 1.3, 30.0)  # 累积退避
+                await _on_success()
             return success, err_msg
 
         # 3. 先处理历史失败期号
@@ -155,12 +186,12 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
 async def _crawl_one(session: aiohttp.ClientSession, number: int,
                      config: CrawlerSection, signer: WbiSigner,
                      mixin_refresher, retry_delay: float,
-                     max_retries: int | None = None) -> tuple[bool, str, int]:
-    """爬取单期，含重试 + WBI 刷新 + 指数退避 + 限流处理。
+                     max_retries: int | None = None,
+                     on_rate_hit=None, on_success=None) -> tuple[bool, str, int]:
+    """爬取单期，含重试 + WBI 刷新 + 全局限流退避。
     返回 (成功, 错误信息, 本次尝试的请求数)。"""
     retries = max_retries if max_retries is not None else config.max_retries
     last_error = ""
-    delay = retry_delay  # 指数退避起点
     reqs_this_week = 0
 
     for attempt in range(1, retries + 1):
@@ -170,12 +201,11 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
         except BiliCodeError as e:
             last_error = str(e)
             reqs_this_week += 1
-            # -352: rate limited — exponential backoff
+            # -352: rate limited → 全局限流退避
             if e.bili_code == -352:
-                print(f"  ⏳ Week #{number}: rate limited (code=-352), "
-                      f"backing off {delay:.1f}s → {min(delay * 2, 60.0):.1f}s")
-                delay = min(delay * 2, 60.0)  # cap at 60s
-            # -403 / -401: auth failure → refresh WBI key
+                if on_rate_hit:
+                    await on_rate_hit(f"Week #{number} rate limited (code=-352)",
+                                     multiplier=2.0, cap=60.0)
             elif e.bili_code in (-403, -401):
                 print(f"  ⚠ Week #{number}: auth failure (code={e.bili_code}), refreshing key…")
                 new_key = await mixin_refresher(session)
@@ -183,40 +213,44 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
             else:
                 print(f"  ⚠ Week #{number}: Bilibili code={e.bili_code}, retrying…")
             if attempt < retries:
-                await asyncio.sleep(_jitter(delay))
+                await asyncio.sleep(_jitter(config.retry_delay))
             continue
         except HttpError as e:
             last_error = str(e)
             reqs_this_week += 1
-            # HTTP 412: 触发风控 → 激进退避 + 刷新密钥
+            # HTTP 412: 风控 → 全局限流 + 刷新密钥
             if "412" in last_error:
-                print(f"  🛡 Week #{number}: risk control triggered (HTTP 412), "
-                      f"refreshing key + backing off {delay:.1f}s → {min(delay * 3, 120.0):.1f}s")
+                print(f"  🛡 Week #{number}: risk control (HTTP 412), refreshing key…")
                 new_key = await mixin_refresher(session)
                 signer._key = new_key
-                delay = min(delay * 3, 120.0)  # 风控退避更激进，上限 120s
-            # Auth-related HTTP errors → refresh WBI key
+                if on_rate_hit:
+                    await on_rate_hit(f"Week #{number} risk control (HTTP 412)",
+                                     multiplier=3.0, cap=120.0)
             elif "403" in last_error or "401" in last_error:
                 print(f"  ⚠ Week #{number}: HTTP {e.status}, refreshing WBI key…")
                 new_key = await mixin_refresher(session)
                 signer._key = new_key
             if attempt < retries:
-                await asyncio.sleep(_jitter(delay))
+                await asyncio.sleep(_jitter(config.retry_delay))
             continue
 
         # 成功前检测空响应
         if not data.get("list") and not data.get("config"):
             last_error = "HTTP 200: empty response"
             print(f"  ⚠ Week #{number}: empty response (attempt {attempt}/{retries}), "
-                  f"refreshing key + backoff {delay:.1f}s…")
+                  f"refreshing key…")
             new_key = await mixin_refresher(session)
             signer._key = new_key
-            delay = min(delay * 1.5, 30.0)  # 温和退避
+            if on_rate_hit:
+                await on_rate_hit(f"Week #{number} empty response",
+                                 multiplier=1.5, cap=30.0)
             if attempt < retries:
-                await asyncio.sleep(_jitter(delay))
+                await asyncio.sleep(_jitter(config.retry_delay))
             continue
 
-        # 成功 → 重置退避延迟
+        # 成功
+        if on_success:
+            await on_success()
         await save_week(number, {"number": number, "config": data.get("config", {}),
                                  "videos": data.get("list", [])})
         progress = await load_progress()
