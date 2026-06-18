@@ -45,6 +45,7 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
     signer = WbiSigner(mixin_key)
     refresher = lambda s: fetch_mixin_key(s, cookie=cookie)
     request_count = 0  # 跟踪已发送请求数，用于主动密钥刷新和 session 轮换
+    old_sessions: list[aiohttp.ClientSession] = []  # 旋转时替换的旧 session，finally 关闭
 
     # ── 全局共享限流状态（所有并发请求统一退避）──
     rate_limit = {
@@ -64,12 +65,14 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
         if should_rotate:
             print(f"  🔄 Session rotation (hit {rotate_threshold}+ rate limits, "
                   f"new device ID → may reset IP-level counter)")
-            # 创建新 session（不关旧的——并发请求可能还在用）
+            # 创建新 session，旧 session 记入待清理列表
             async with rate_limit["lock"]:
+                old_sessions.append(session)
                 session = create_session(cookie=config.cookie)
                 signer._key = await refresher(session)
                 rate_limit["hits_since_rotate"] = 0
-                rate_limit["delay"] = config.retry_delay
+                # 只降到 base 的 2 倍（IP 瓶颈没解决，不归零）
+                rate_limit["delay"] = max(config.retry_delay * 2, rate_limit["delay"] * 0.3)
 
     async def _on_rate_hit(msg: str, multiplier: float = 2.0, cap: float = 60.0):
         """全局限流命中：所有 worker 统一退避 + 连续命中换 session。"""
@@ -198,6 +201,9 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
             duration_seconds=round(duration, 2)
         )
     finally:
+        for s in old_sessions:
+            if not s.closed:
+                await s.close()
         if not session.closed:
             await session.close()
 
@@ -228,6 +234,11 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
                                      multiplier=2.0, cap=60.0)
                 if on_rate_rotate:
                     await on_rate_rotate()
+            # -404: week not found → skip (not retryable)
+            elif e.bili_code == -404:
+                last_error = f"Week #{number} not found (code=-404)"
+                print(f"  ⚠ {last_error}, skipping…")
+                break  # exit retry loop immediately
             elif e.bili_code in (-403, -401):
                 print(f"  ⚠ Week #{number}: auth failure (code={e.bili_code}), refreshing key…")
                 new_key = await mixin_refresher(session)
