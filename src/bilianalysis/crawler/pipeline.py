@@ -167,6 +167,23 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
                 failed_details[number] = err_msg
             await asyncio.sleep(_jitter(config.request_delay))
 
+        # 4.5 本轮失败期号集中重试一次
+        retry_now = sorted(list(failed_details.keys()))
+        if retry_now:
+            print(f"\n  🔁 Retrying {len(retry_now)} failed weeks from this run…")
+            retried_ok = 0
+            for number in retry_now:
+                success, err_msg = await _crawl_with_rotation(number, max_retries=2)
+                if success:
+                    crawled_count += 1
+                    failed_count -= 1
+                    failed_details.pop(number, None)
+                    retried_ok += 1
+                else:
+                    failed_details[number] = err_msg  # update with latest error
+                await asyncio.sleep(_jitter(config.request_delay))
+            print(f"  ✅ Retry done: {retried_ok}/{len(retry_now)} recovered")
+
         # 5. 更新最后运行时间
         progress = await load_progress()
         progress.last_run = datetime.datetime.now()
