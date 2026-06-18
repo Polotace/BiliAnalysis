@@ -1,0 +1,308 @@
+okoko<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BiliInsight — 发现每周好内容</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ── Reset & Base ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body {
+    font-family: 'Inter', 'HarmonyOS Sans SC', 'PingFang SC', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: #FAFAFA;
+    color: #111827;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+  /* ── Design Tokens ── */
+  :root {
+    --blue: #00AEEC;
+    --blue-light: #E6F7FD;
+    --bg: #FAFAFA;
+    --card: #FFFFFF;
+    --text: #111827;
+    --text-secondary: #6B7280;
+    --border: #E5E7EB;
+    --success: #22C55E;
+    --warning: #F59E0B;
+    --radius: 12px;
+    --radius-lg: 16px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.05);
+    --max-width: 1280px;
+  }
+  /* ── Typography ── */
+  .tabular { font-variant-numeric: tabular-nums; }
+  h1 { font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em; }
+  h2 { font-size: 1.25rem; font-weight: 600; }
+  .section-label { font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
+  /* ── Layout ── */
+  .page { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+  .section { padding: 48px 0; }
+  .section-header { margin-bottom: 24px; }
+  .section-header h2 { margin-bottom: 4px; }
+  /* ── TopNav ── */
+  .topnav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(250,250,250,0.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topnav-inner {
+    max-width: var(--max-width); margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; height: 56px; gap: 32px;
+  }
+  .topnav-logo { font-size: 1.125rem; font-weight: 700; color: var(--text); text-decoration: none; letter-spacing: -0.01em; }
+  .topnav-logo span { color: var(--blue); }
+  .topnav-links { display: flex; gap: 24px; list-style: none; }
+  .topnav-links a {
+    text-decoration: none; font-size: 0.9375rem; font-weight: 500;
+    color: var(--text-secondary); padding: 4px 0;
+    transition: color 0.2s; position: relative;
+  }
+  .topnav-links a:hover, .topnav-links a.active { color: var(--text); }
+  .topnav-links a.active::after {
+    content: ''; position: absolute; bottom: -16px; left: 0; right: 0; height: 2px;
+    background: var(--blue); border-radius: 2px;
+  }
+  /* ── Hero ── */
+  .hero {
+    background: linear-gradient(135deg, #CCF0FC 0%, #E6F7FD 50%, #FAFAFA 100%);
+    border-radius: var(--radius-lg); padding: 96px 64px 80px;
+    text-align: center; margin-top: 24px;
+    box-shadow: var(--shadow);
+  }
+  .hero h1 { margin-bottom: 16px; }
+  .hero p { font-size: 1.125rem; color: #4B7A8F; max-width: 480px; margin: 0 auto 36px; line-height: 1.7; }
+  .hero-cta {
+    display: inline-block; padding: 10px 28px;
+    background: var(--blue); color: #fff;
+    border-radius: 8px; font-weight: 600; font-size: 0.9375rem;
+    text-decoration: none; transition: opacity 0.2s;
+  }
+  .hero-cta:hover { opacity: 0.9; }
+  /* ── KPI Cards ── */
+  .kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  .kpi-card {
+    background: var(--card); border-radius: var(--radius);
+    padding: 24px; box-shadow: var(--shadow);
+    transition: box-shadow 0.2s, transform 0.2s;
+  }
+  .kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
+  .kpi-label { font-size: 0.8125rem; color: var(--text-secondary); margin-bottom: 8px; }
+  .kpi-value { font-size: 2rem; font-weight: 700; letter-spacing: -0.01em; }
+  .kpi-sub { font-size: 0.8125rem; color: var(--text-secondary); margin-top: 4px; }
+  /* ── Category Bar ── */
+  .bar-list { display: flex; flex-direction: column; gap: 12px; }
+  .bar-item { display: flex; align-items: center; gap: 16px; }
+  .bar-label { width: 56px; font-size: 0.875rem; font-weight: 500; text-align: right; flex-shrink: 0; }
+  .bar-track { flex: 1; height: 32px; background: #F3F4F6; border-radius: 6px; overflow: hidden; position: relative; }
+  .bar-fill { height: 100%; background: var(--blue); border-radius: 6px; transition: width 0.6s ease; display: flex; align-items: center; padding-left: 12px; }
+  .bar-fill span { font-size: 0.8125rem; font-weight: 500; color: #fff; white-space: nowrap; }
+  .bar-value { width: 72px; font-size: 0.875rem; font-weight: 500; flex-shrink: 0; }
+  /* ── Two Col ── */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .panel {
+    background: var(--card); border-radius: var(--radius);
+    padding: 24px; box-shadow: var(--shadow);
+  }
+  .panel-header { margin-bottom: 20px; }
+  .panel-header h3 { font-size: 1rem; font-weight: 600; }
+  /* ── Creator List ── */
+  .creator-list { display: flex; flex-direction: column; gap: 0; }
+  .creator-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 0; border-bottom: 1px solid #F3F4F6;
+  }
+  .creator-item:last-child { border-bottom: none; }
+  .creator-rank {
+    width: 28px; height: 28px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8125rem; font-weight: 700; flex-shrink: 0;
+  }
+  .creator-rank.top { background: var(--blue); color: #fff; }
+  .creator-rank.normal { background: #F3F4F6; color: var(--text-secondary); }
+  .creator-name { font-weight: 500; flex: 1; }
+  .creator-count { font-size: 0.875rem; color: var(--text-secondary); }
+  .creator-count strong { color: var(--text); font-weight: 600; }
+  /* ── Mini Trend ── */
+  .mini-chart { height: 200px; position: relative; }
+  .mini-chart svg { width: 100%; height: 100%; }
+  .chart-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 0.8125rem; color: var(--text-secondary); }
+  .chart-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  /* ── State: empty / loading ── */
+  .placeholder-box {
+    background: #F3F4F6; border-radius: var(--radius);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-secondary); font-size: 0.875rem;
+    min-height: 200px;
+  }
+  /* ── Footer note ── */
+  .design-note {
+    text-align: center; padding: 32px 0 48px;
+    font-size: 0.8125rem; color: #D1D5DB;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══ Top Navigation ═══ -->
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a href="/" class="topnav-logo">Bili<span>Insight</span></a>
+    <ul class="topnav-links">
+      <li><a href="/" class="active">发现</a></li>
+      <li><a href="/analysis/stats">分析</a></li>
+    </ul>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- ═══ Hero ═══ -->
+  <section class="hero">
+    <h1>发现每周好内容</h1>
+    <p>基于 Bilibili「每周必看」数据，探索热门视频、活跃创作者与内容趋势。</p>
+    <!-- CTA 暂时不链到具体页面，因为视频库还未就绪 -->
+    <!-- <a href="/videos" class="hero-cta">浏览视频库</a> -->
+  </section>
+
+  <!-- ═══ KPI Cards ═══ -->
+  <section class="section">
+    <div class="section-header">
+      <p class="section-label">核心数据</p>
+      <h2>平台概览</h2>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">总视频数</div>
+        <div class="kpi-value tabular">380</div>
+        <div class="kpi-sub">覆盖 38 周数据</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">平均播放量</div>
+        <div class="kpi-value tabular">12.5<span style="font-size:1rem;font-weight:500;">万</span></div>
+        <div class="kpi-sub">单视频均值</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">平均点赞</div>
+        <div class="kpi-value tabular">8.2<span style="font-size:1rem;font-weight:500;">k</span></div>
+        <div class="kpi-sub">点赞率 6.8%</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">活跃 UP 主</div>
+        <div class="kpi-value tabular">156</div>
+        <div class="kpi-sub">至少上榜 1 次</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Category Bar ═══ -->
+  <section class="section">
+    <div class="section-header">
+      <p class="section-label">热门分区</p>
+      <h2>内容分布</h2>
+    </div>
+    <div class="panel">
+      <div class="bar-list">
+        <div class="bar-item">
+          <span class="bar-label">游戏</span>
+          <div class="bar-track"><div class="bar-fill" style="width:80%"><span>32%</span></div></div>
+          <span class="bar-value tabular">122 个</span>
+        </div>
+        <div class="bar-item">
+          <span class="bar-label">生活</span>
+          <div class="bar-track"><div class="bar-fill" style="width:62%"><span>25%</span></div></div>
+          <span class="bar-value tabular">95 个</span>
+        </div>
+        <div class="bar-item">
+          <span class="bar-label">知识</span>
+          <div class="bar-track"><div class="bar-fill" style="width:45%"><span>18%</span></div></div>
+          <span class="bar-value tabular">68 个</span>
+        </div>
+        <div class="bar-item">
+          <span class="bar-label">动画</span>
+          <div class="bar-track"><div class="bar-fill" style="width:30%"><span>12%</span></div></div>
+          <span class="bar-value tabular">46 个</span>
+        </div>
+        <div class="bar-item">
+          <span class="bar-label">音乐</span>
+          <div class="bar-track"><div class="bar-fill" style="width:20%"><span>8%</span></div></div>
+          <span class="bar-value tabular">30 个</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ Creator List + Trend ═══ -->
+  <section class="section">
+    <div class="section-header">
+      <p class="section-label">创作者 &amp; 趋势</p>
+      <h2>深度洞察</h2>
+    </div>
+    <div class="two-col">
+      <!-- Creator Top 5 -->
+      <div class="panel">
+        <div class="panel-header"><h3>活跃 UP 主</h3></div>
+        <div class="creator-list">
+          <div class="creator-item">
+            <span class="creator-rank top">1</span>
+            <span class="creator-name">老番茄</span>
+            <span class="creator-count">上榜 <strong>15</strong> 次</span>
+          </div>
+          <div class="creator-item">
+            <span class="creator-rank top">2</span>
+            <span class="creator-name">某幻君</span>
+            <span class="creator-count">上榜 <strong>11</strong> 次</span>
+          </div>
+          <div class="creator-item">
+            <span class="creator-rank top">3</span>
+            <span class="creator-name">中国BOY</span>
+            <span class="creator-count">上榜 <strong>9</strong> 次</span>
+          </div>
+          <div class="creator-item">
+            <span class="creator-rank normal">4</span>
+            <span class="creator-name">逍遥散人</span>
+            <span class="creator-count">上榜 <strong>8</strong> 次</span>
+          </div>
+          <div class="creator-item">
+            <span class="creator-rank normal">5</span>
+            <span class="creator-name">泛式</span>
+            <span class="creator-count">上榜 <strong>7</strong> 次</span>
+          </div>
+        </div>
+      </div>
+      <!-- Mini Trend -->
+      <div class="panel">
+        <div class="panel-header"><h3>周均播放趋势</h3></div>
+        <div class="mini-chart">
+          <!-- Simple SVG sparkline — 真实版本用 ECharts -->
+          <svg viewBox="0 0 400 200" preserveAspectRatio="none">
+            <!-- grid lines -->
+            <line x1="0" y1="50" x2="400" y2="50" stroke="#F3F4F6" stroke-width="1"/>
+            <line x1="0" y1="100" x2="400" y2="100" stroke="#F3F4F6" stroke-width="1"/>
+            <line x1="0" y1="150" x2="400" y2="150" stroke="#F3F4F6" stroke-width="1"/>
+            <!-- area fill -->
+            <path d="M0,140 C20,135 30,130 50,125 C70,118 80,112 100,108 C120,104 130,120 150,115 C170,110 180,100 200,95 C220,88 230,90 250,85 C270,80 280,70 300,65 C320,58 330,60 350,55 C370,50 380,55 400,52 L400,200 L0,200 Z" fill="rgba(0,174,236,0.08)"/>
+            <!-- line -->
+            <path d="M0,140 C20,135 30,130 50,125 C70,118 80,112 100,108 C120,104 130,120 150,115 C170,110 180,100 200,95 C220,88 230,90 250,85 C270,80 280,70 300,65 C320,58 330,60 350,55 C370,50 380,55 400,52" fill="none" stroke="#00AEEC" stroke-width="2.5" stroke-linecap="round"/>
+            <!-- last dot -->
+            <circle cx="400" cy="52" r="4" fill="#00AEEC"/>
+          </svg>
+        </div>
+        <div class="chart-legend">
+          <span><span class="chart-dot" style="background:var(--blue)"></span> 平均播放量</span>
+          <span style="color:#D1D5DB">最近 10 周</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<p class="design-note">Design Mockup · 数据为占位示例 · 实际数据由 API 驱动</p>
+
+</body>
+</html>
