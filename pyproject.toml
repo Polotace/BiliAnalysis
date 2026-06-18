@@ -41,6 +41,9 @@ testpaths = ["tests"]
 packages = ["src/crawler", "src/utils"]
 package-dir = {"" = "src"}
 
+[project.scripts]
+bilianalysis = "app.cli:app"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
