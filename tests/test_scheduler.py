@@ -266,3 +266,57 @@ class TestBuiltinTasks:
 
         assert result.status == "failed"
         assert "network error" in result.error
+
+
+from bilianalysis.scheduler.cron_service import CronService
+
+
+class TestCronService:
+    @pytest.mark.asyncio
+    async def test_create_app_returns_fastapi(self):
+        config = AppConfig(scheduler=SchedulerConfig(pipelines={}))
+        service = CronService(config)
+        app = service.create_app()
+        assert app.title == "BiliAnalysis Scheduler"
+
+    @pytest.mark.asyncio
+    async def test_health_endpoint(self):
+        from fastapi.testclient import TestClient
+
+        config = AppConfig(scheduler=SchedulerConfig(
+            pipelines={"full": PipelineConfig(steps=["crawl"])}
+        ))
+        service = CronService(config)
+        app = service.create_app()
+        client = TestClient(app)
+        resp = client.get("/health")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ok"
+
+    @pytest.mark.asyncio
+    async def test_list_pipelines(self):
+        from fastapi.testclient import TestClient
+
+        config = AppConfig(scheduler=SchedulerConfig(
+            pipelines={
+                "full": PipelineConfig(schedule="0 12 * * 6", steps=["crawl"]),
+            }
+        ))
+        service = CronService(config)
+        app = service.create_app()
+        client = TestClient(app)
+        resp = client.get("/pipelines")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["full"]["schedule"] == "0 12 * * 6"
+
+    @pytest.mark.asyncio
+    async def test_trigger_nonexistent_pipeline_404(self):
+        from fastapi.testclient import TestClient
+
+        config = AppConfig(scheduler=SchedulerConfig(pipelines={}))
+        service = CronService(config)
+        app = service.create_app()
+        client = TestClient(app)
+        resp = client.post("/pipelines/nonexistent/run")
+        assert resp.status_code == 404
