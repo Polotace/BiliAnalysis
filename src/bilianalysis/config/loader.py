@@ -7,7 +7,8 @@ import yaml
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .model import (
-    AppConfig, CrawlerSection, AnalysisSection, DataSection
+    AppConfig, CrawlerSection, AnalysisSection, DataSection,
+    SchedulerConfig,
 )
 
 
@@ -22,6 +23,7 @@ class _AppSettings(BaseSettings):
     crawler: CrawlerSection = CrawlerSection()
     analysis: AnalysisSection = AnalysisSection()
     data: DataSection = DataSection()
+    scheduler: SchedulerConfig = SchedulerConfig()
 
 
 def _merge_env_vars(data: dict[str, Any]) -> None:
@@ -61,4 +63,5 @@ def load_config(config_path: str | None = None) -> AppConfig:
         crawler=settings.crawler,
         analysis=settings.analysis,
         data=settings.data,
+        scheduler=settings.scheduler,
     )
