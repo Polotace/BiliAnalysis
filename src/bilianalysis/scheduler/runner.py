@@ -1,11 +1,11 @@
 """PipelineRunner——按序执行 Task 列表。"""
 from datetime import datetime, timezone
-
+from typing import Literal
 from bilianalysis.config.model import AppConfig
 from bilianalysis.engine.base import AnalysisEngine
 from bilianalysis.scheduler.task import TaskContext, TaskResult
 from bilianalysis.scheduler.registry import get_task
-from bilianalysis.scheduler.models import RunRecord
+from bilianalysis.scheduler.models import RunRecord, TRIGGER_TYPE
 
 
 class PipelineRunner:
@@ -19,10 +19,11 @@ class PipelineRunner:
         """惰性创建分析引擎（Pandas 或 Spark）。"""
         if self._engine is None:
             from bilianalysis.engine import create_engine
-            self._engine = create_engine(self._config)
-        return self._engine
+            return create_engine(self._config)
+        else:
+            return self._engine
 
-    async def run(self, name: str, trigger: str = "manual") -> RunRecord:
+    async def run(self, name: str, trigger: TRIGGER_TYPE = "manual") -> RunRecord:
         """执行一条流水线。"""
         pipeline = self._config.scheduler.pipelines[name]
         record = RunRecord(pipeline=name, trigger=trigger)

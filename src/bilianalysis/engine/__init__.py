@@ -21,7 +21,7 @@ def create_engine(config: AppConfig) -> AnalysisEngine:
     """根据配置创建分析引擎实例。"""
     if config.analysis.engine == "spark":
         if not _HAS_SPARK:
-            raise ImportError("PySpark is not installed. Install with: uv add pyspark")
+            raise ImportError("PySpark is not installed. Install it firstly.")
         return SparkEngine(config.data)
     return PandasEngine(config.data)
 

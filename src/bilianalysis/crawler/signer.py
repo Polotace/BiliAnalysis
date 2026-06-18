@@ -14,11 +14,16 @@ MIXIN_TABLE = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35,
 
 WEB_LOCATION = "333.934"
 NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
+BILI_HEADER = {
+    "Referer": "https://www.bilibili.com/",
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+}
 
 
 async def fetch_mixin_key(session: aiohttp.ClientSession) -> str:
     """从 nav 接口获取 img_key + sub_key，计算 mixin_key。"""
-    resp = await get(session, NAV_URL)
+    resp = await get(session, NAV_URL, headers=BILI_HEADER)
     wbi_img: dict[str, str] = resp.get("data", {}).get("wbi_img", {})
     img_url: str = wbi_img.get("img_url", "")
     sub_url: str = wbi_img.get("sub_url", "")

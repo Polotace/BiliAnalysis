@@ -1,5 +1,5 @@
 # app/cli/schedule_cmd.py
-"""schedule subcommand group - run / serve / list / test."""
+"""schedule subcommand group - run / list / test."""
 import asyncio
 
 import typer
@@ -9,10 +9,9 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from bilianalysis.config import load_config
 from bilianalysis.scheduler.registry import list_tasks, get_task
 from bilianalysis.scheduler.runner import PipelineRunner
-from bilianalysis.scheduler.cron_service import CronService
 import bilianalysis.scheduler.builtins  # noqa: F401  (triggers task registration)
 from app.cli.utils import (
-    console, make_task_table, make_pipeline_table, make_serve_banner,
+    console, make_task_table, make_pipeline_table,
 )
 
 schedule_app = typer.Typer(name="schedule", help="Scheduler management")
@@ -91,35 +90,6 @@ def run_cmd(
 
     status_color = "green" if record.status == "success" else "red"
     console.print(f"\n[{status_color}]Pipeline '{pipeline}': {record.status}[/{status_color}]")
-
-
-@schedule_app.command("serve")
-def serve_cmd(
-    port: int = typer.Option(8080, "--port", "-p", help="API listen port"),
-    config_path: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
-):
-    """Start the scheduler daemon (cron + HTTP API)."""
-    import uvicorn
-    from app.api import create_scheduler_app
-
-    config = load_config(config_path)
-    console.print(make_serve_banner(config))
-    console.print(f"\n  API:   [cyan]http://127.0.0.1:{port}[/cyan]")
-    console.print(f"  Docs:  [cyan]http://127.0.0.1:{port}/docs[/cyan]\n")
-
-    service = CronService(config)
-    service.setup_schedule()
-
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    service.start_scheduler(loop)
-
-    app = create_scheduler_app(service)
-    try:
-        uvicorn.run(app, host="127.0.0.1", port=port, log_level="info")
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Shutting down...[/yellow]")
-        service.stop()
 
 
 @schedule_app.command("test")

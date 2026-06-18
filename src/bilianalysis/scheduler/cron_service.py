@@ -9,13 +9,14 @@ import schedule
 
 from bilianalysis.config.model import AppConfig
 from bilianalysis.scheduler.runner import PipelineRunner
-from bilianalysis.scheduler.models import RunRecord
+from bilianalysis.scheduler.models import RunRecord, TRIGGER_TYPE
 
 logger = logging.getLogger("bilianalysis.scheduler")
 
 
 class CronService:
-    """常驻调度服务。
+    """
+    常驻调度服务。
 
     后台线程轮询 schedule 库，到点时通过 run_coroutine_threadsafe
     提交到 asyncio event loop。不含 FastAPI —— Web 层由 app/api.py 负责。
@@ -87,7 +88,7 @@ class CronService:
             self.execute_pipeline(name, "cron"), self._loop
         )
 
-    async def execute_pipeline(self, name: str, trigger: str) -> RunRecord:
+    async def execute_pipeline(self, name: str, trigger: TRIGGER_TYPE) -> RunRecord:
         """执行流水线并记录历史。公开方法，CLI / API 均可调用。"""
         logger.info("Pipeline '%s' triggered by %s", name, trigger)
         record = await self.runner.run(name, trigger=trigger)

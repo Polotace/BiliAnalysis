@@ -269,7 +269,6 @@ class TestBuiltinTasks:
 
 
 from bilianalysis.scheduler.cron_service import CronService
-from app.api import create_scheduler_app
 
 
 class TestCronService:
@@ -287,53 +286,6 @@ class TestCronService:
         config = AppConfig(scheduler=SchedulerConfig(pipelines={}))
         service = CronService(config)
         service.stop()  # should not raise
-
-
-class TestSchedulerAPI:
-    """FastAPI layer tests — uses app.api.create_scheduler_app()."""
-
-    @pytest.mark.asyncio
-    async def test_health_endpoint(self):
-        from fastapi.testclient import TestClient
-
-        config = AppConfig(scheduler=SchedulerConfig(
-            pipelines={"full": PipelineConfig(steps=["crawl"])}
-        ))
-        service = CronService(config)
-        app = create_scheduler_app(service)
-        client = TestClient(app)
-        resp = client.get("/health")
-        assert resp.status_code == 200
-        assert resp.json()["status"] == "ok"
-        assert "full" in resp.json()["pipelines"]
-
-    @pytest.mark.asyncio
-    async def test_list_pipelines(self):
-        from fastapi.testclient import TestClient
-
-        config = AppConfig(scheduler=SchedulerConfig(
-            pipelines={
-                "full": PipelineConfig(schedule="0 12 * * 6", steps=["crawl"]),
-            }
-        ))
-        service = CronService(config)
-        app = create_scheduler_app(service)
-        client = TestClient(app)
-        resp = client.get("/pipelines")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert data["full"]["schedule"] == "0 12 * * 6"
-
-    @pytest.mark.asyncio
-    async def test_trigger_nonexistent_pipeline_404(self):
-        from fastapi.testclient import TestClient
-
-        config = AppConfig(scheduler=SchedulerConfig(pipelines={}))
-        service = CronService(config)
-        app = create_scheduler_app(service)
-        client = TestClient(app)
-        resp = client.post("/pipelines/nonexistent/run")
-        assert resp.status_code == 404
 
 
 from typer.testing import CliRunner

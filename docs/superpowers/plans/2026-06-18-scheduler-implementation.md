@@ -1259,6 +1259,7 @@ import typer
 
 app = typer.Typer(name="bilianalysis", help="Bilibili 每周必看数据分析平台")
 
+
 # 延迟导入子命令，避免启动时加载所有依赖
 @app.callback()
 def _main():
@@ -1298,7 +1299,6 @@ from app.cli.utils import (
 
 schedule_app = typer.Typer(name="schedule", help="定时调度管理")
 
-
 # Task 描述映射（用于 list 命令）
 _TASK_DESCRIPTIONS = {
     "crawl": "爬取B站每周必看原始数据",
@@ -1311,7 +1311,7 @@ _TASK_DESCRIPTIONS = {
 
 @schedule_app.command("list")
 def list_cmd(
-    config_path: str = typer.Option("config.yaml", "--config", "-c", help="配置文件路径"),
+        config_path: str = typer.Option("config.yaml", "--config", "-c", help="配置文件路径"),
 ):
     """列出所有可用的 Task 和 Pipeline。"""
     from bilianalysis.scheduler.builtins import *  # noqa: F401  # 触发注册
@@ -1334,8 +1334,8 @@ def list_cmd(
 
 @schedule_app.command("run")
 def run_cmd(
-    pipeline: str = typer.Option(..., "--pipeline", "-p", help="流水线名称"),
-    config_path: str = typer.Option("config.yaml", "--config", "-c", help="配置文件路径"),
+        pipeline: str = typer.Option(..., "--pipeline", "-p", help="流水线名称"),
+        config_path: str = typer.Option("config.yaml", "--config", "-c", help="配置文件路径"),
 ):
     """手动触发一次流水线执行。"""
     from bilianalysis.scheduler.builtins import *  # noqa: F401
@@ -1387,8 +1387,8 @@ def run_cmd(
 
 @schedule_app.command("serve")
 def serve_cmd(
-    port: int = typer.Option(8080, "--port", "-p", help="API 监听端口"),
-    config_path: str = typer.Option("config.yaml", "--config", "-c", help="配置文件路径"),
+        port: int = typer.Option(8080, "--port", "-p", help="API 监听端口"),
+        config_path: str = typer.Option("config.yaml", "--config", "-c", help="配置文件路径"),
 ):
     """启动常驻调度进程（cron 定时 + HTTP API）。"""
     from bilianalysis.scheduler.builtins import *  # noqa: F401
@@ -1408,8 +1408,8 @@ def serve_cmd(
 
 @schedule_app.command("test")
 def test_cmd(
-    pipeline: str = typer.Option(..., "--pipeline", "-p", help="流水线名称"),
-    config_path: str = typer.Option("config.yaml", "--config", "-c", help="配置文件路径"),
+        pipeline: str = typer.Option(..., "--pipeline", "-p", help="流水线名称"),
+        config_path: str = typer.Option("config.yaml", "--config", "-c", help="配置文件路径"),
 ):
     """试跑校验——仅检查配置、导入和步骤名称。"""
     from bilianalysis.scheduler.builtins import *  # noqa: F401
