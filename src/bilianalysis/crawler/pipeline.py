@@ -51,10 +51,28 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
         "delay": config.retry_delay,  # 所有 worker 共用
         "lock": asyncio.Lock(),
         "cool_until": 0.0,
+        "hits_since_rotate": 0,       # 本次 session 累计 -352 次数
     }
 
+    async def _maybe_rotate_on_rate_limit():
+        """连续 -352 超阈值 → 换 session（新设备指纹），重置 IP 维度的限流压力。"""
+        nonlocal session
+        rotate_threshold = 3
+        async with rate_limit["lock"]:
+            rate_limit["hits_since_rotate"] += 1
+            should_rotate = rate_limit["hits_since_rotate"] >= rotate_threshold
+        if should_rotate:
+            print(f"  🔄 Session rotation (hit {rotate_threshold}+ rate limits, "
+                  f"new device ID → may reset IP-level counter)")
+            await session.close()
+            session = create_session(cookie=config.cookie)
+            signer._key = await refresher(session)  # 新 session 也刷新 key
+            async with rate_limit["lock"]:
+                rate_limit["hits_since_rotate"] = 0
+                rate_limit["delay"] = config.retry_delay  # 重置延迟
+
     async def _on_rate_hit(msg: str, multiplier: float = 2.0, cap: float = 60.0):
-        """全局限流命中：所有 worker 统一退避。"""
+        """全局限流命中：所有 worker 统一退避 + 连续命中换 session。"""
         async with rate_limit["lock"]:
             rate_limit["delay"] = min(rate_limit["delay"] * multiplier, cap)
             rate_limit["cool_until"] = time.monotonic() + rate_limit["delay"]
@@ -201,11 +219,12 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
         except BiliCodeError as e:
             last_error = str(e)
             reqs_this_week += 1
-            # -352: rate limited → 全局限流退避
+            # -352: rate limited → 全局限流退避 + 连续命中换 session
             if e.bili_code == -352:
                 if on_rate_hit:
                     await on_rate_hit(f"Week #{number} rate limited (code=-352)",
                                      multiplier=2.0, cap=60.0)
+                await _maybe_rotate_on_rate_limit()
             elif e.bili_code in (-403, -401):
                 print(f"  ⚠ Week #{number}: auth failure (code={e.bili_code}), refreshing key…")
                 new_key = await mixin_refresher(session)
