@@ -120,15 +120,18 @@ class PandasEngine(AnalysisEngine):
 
         for rec in records:
             cfg = rec.get("config", {})
+            videos = rec.get("videos", [])
+            if not cfg and not videos:
+                continue  # skip empty weeks
             weekly_rows.append({
                 "number": rec.get("number"),
                 "subject": cfg.get("subject"),
                 "name": cfg.get("name"),
-                "start_time": cfg.get("start_time"),
-                "end_time": cfg.get("end_time"),
+                "start_time": cfg.get("stime"),
+                "end_time": cfg.get("etime"),
             })
 
-            for v in rec.get("videos", []):
+            for v in videos:
                 owner = v.get("owner", {})
                 stat = v.get("stat", {})
 
