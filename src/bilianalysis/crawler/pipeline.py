@@ -140,7 +140,7 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
                 current_delay = rate_limit["delay"]
             success, err_msg, reqs = await _crawl_one(
                 session, number, config, signer, refresher,
-                current_delay, max_retries=max_retries,
+                current_delay, rate_limit, max_retries=max_retries,
                 on_rate_hit=_on_rate_hit, on_success=_on_success,
                 on_rate_rotate=_maybe_rotate_on_rate_limit,
             )
@@ -211,6 +211,7 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
 async def _crawl_one(session: aiohttp.ClientSession, number: int,
                      config: CrawlerSection, signer: WbiSigner,
                      mixin_refresher, retry_delay: float,
+                     rate_limit: dict,
                      max_retries: int | None = None,
                      on_rate_hit=None, on_success=None,
                      on_rate_rotate=None) -> tuple[bool, str, int]:
@@ -221,6 +222,14 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
     reqs_this_week = 0
 
     for attempt in range(1, retries + 1):
+        # 重试前等待全局限流冷却
+        if attempt > 1:
+            for _ in range(20):  # 最多等 20 轮
+                async with rate_limit["lock"]:
+                    cool = rate_limit["cool_until"] - time.monotonic()
+                if cool <= 0:
+                    break
+                await asyncio.sleep(min(cool, 3.0))
         try:
             data = await get_weekly_videos(session, number, signer)
             reqs_this_week += 1
