@@ -16,9 +16,14 @@ class HttpError(Exception):
         super().__init__(f"[{status}] {message}" if message else f"[{status}]")
 
 
-def create_session(timeout: aiohttp.ClientTimeout | None = None) -> aiohttp.ClientSession:
-    """创建预配置 Session：自动注入随机 UA header + 超时"""
+def create_session(
+    timeout: aiohttp.ClientTimeout | None = None,
+    cookie: str = "",
+) -> aiohttp.ClientSession:
+    """创建预配置 Session：自动注入随机 UA header + 超时 + 可选 Cookie。"""
     headers = {"User-Agent": ua.random}
+    if cookie:
+        headers["Cookie"] = cookie
     return aiohttp.ClientSession(headers=headers, timeout=timeout or DEFAULT_TIMEOUT)
 
 
@@ -34,9 +39,11 @@ async def _request(
     """内部方法：发送 HTTP 请求并解析响应。"""
     req_headers = dict(headers) if headers else {}
     try:
-        async with getattr(session, method)(
-            url, headers=req_headers or None, data=data, json=json
-        ) as resp:
+        kwargs = {"headers": req_headers or None}
+        if method in ("post", "put", "patch"):
+            kwargs["data"] = data
+            kwargs["json"] = json
+        async with getattr(session, method)(url, **kwargs) as resp:
             if resp.status == 200:
                 content_type = resp.content_type or ""
                 if "application/json" in content_type:

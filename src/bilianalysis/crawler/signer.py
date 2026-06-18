@@ -15,15 +15,25 @@ MIXIN_TABLE = [46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35,
 WEB_LOCATION = "333.934"
 NAV_URL = "https://api.bilibili.com/x/web-interface/nav"
 BILI_HEADER = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0",
     "Referer": "https://www.bilibili.com/",
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
 }
 
 
-async def fetch_mixin_key(session: aiohttp.ClientSession) -> str:
-    """从 nav 接口获取 img_key + sub_key，计算 mixin_key。"""
-    resp = await get(session, NAV_URL, headers=BILI_HEADER)
+async def fetch_mixin_key(session: aiohttp.ClientSession, cookie: str = "") -> str:
+    """从 nav 接口获取 img_key + sub_key，计算 mixin_key。
+
+    Args:
+        session: aiohttp 会话
+        cookie: 可选的 Bilibili Cookie 字符串（不含 "Cookie:" 前缀）
+    """
+    headers = dict(BILI_HEADER)
+    if cookie:
+        headers["Cookie"] = cookie
+
+    resp = await get(session, NAV_URL, headers=headers)
     wbi_img: dict[str, str] = resp.get("data", {}).get("wbi_img", {})
     img_url: str = wbi_img.get("img_url", "")
     sub_url: str = wbi_img.get("sub_url", "")
