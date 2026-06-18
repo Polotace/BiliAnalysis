@@ -75,14 +75,15 @@ async def run(config: CrawlerSection | None = None) -> CrawlReport:
             # 主动刷新 WBI 密钥（到达间隔阈值）
             if config.key_refresh_interval > 0 and request_count > 0 \
                     and request_count % config.key_refresh_interval == 0:
+                print(f"  🔑 Proactive WBI key refresh (request #{request_count})")
                 signer._key = await refresher(session)
 
             # Session 轮换（模拟新连接，避开长连接指纹）
             if config.max_requests_per_session > 0 and request_count > 0 \
                     and request_count % config.max_requests_per_session == 0:
+                print(f"  🔄 Session rotation (request #{request_count}, new device fingerprint)")
                 await session.close()
                 session = create_session(cookie=config.cookie)
-                rotate_session_headers(session, cookie=config.cookie)
 
             success, err_msg, reqs = await _crawl_one(
                 session, number, config, signer, refresher,
@@ -171,10 +172,13 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
             reqs_this_week += 1
             # -352: WBI key expired, -403: forbidden, -401: unauthorized
             if e.bili_code in (-352, -403, -401):
+                print(f"  ⚠ Week #{number}: WBI key expired (code={e.bili_code}), refreshing key…")
                 new_key = await mixin_refresher(session)
                 signer._key = new_key
             # -412: rate limited — exponential backoff
             elif e.bili_code == -412:
+                print(f"  ⏳ Week #{number}: rate limited (412), "
+                      f"backing off {delay:.1f}s → {min(delay * 2, 60.0):.1f}s")
                 delay = min(delay * 2, 60.0)  # cap at 60s
             if attempt < retries:
                 await asyncio.sleep(_jitter(delay))
@@ -184,9 +188,12 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
             reqs_this_week += 1
             # HTTP 412: rate limited
             if "412" in last_error:
+                print(f"  ⏳ Week #{number}: HTTP 412 rate limit, "
+                      f"backing off {delay:.1f}s → {min(delay * 2, 60.0):.1f}s")
                 delay = min(delay * 2, 60.0)
             # Auth-related HTTP errors → refresh WBI key
             elif "403" in last_error or "401" in last_error:
+                print(f"  ⚠ Week #{number}: HTTP {e.status}, refreshing WBI key…")
                 new_key = await mixin_refresher(session)
                 signer._key = new_key
             if attempt < retries:
@@ -196,6 +203,8 @@ async def _crawl_one(session: aiohttp.ClientSession, number: int,
         # 成功前检测空响应
         if not data.get("list") and not data.get("config"):
             last_error = "HTTP 200: empty response"
+            print(f"  ⚠ Week #{number}: empty response (attempt {attempt}/{retries}), "
+                  f"refreshing key + backoff {delay:.1f}s…")
             new_key = await mixin_refresher(session)
             signer._key = new_key
             delay = min(delay * 1.5, 30.0)  # 温和退避
