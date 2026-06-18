@@ -10,6 +10,9 @@ class CrawlerSection(BaseModel):
     request_delay: float = 2.5
     max_retries: int = 3
     retry_delay: float = 1.0
+    cookie: str = ""                             # B站 Cookie（提升请求权重）
+    key_refresh_interval: int = 50               # 主动刷新 WBI 密钥的请求间隔（0=不刷新）
+    max_requests_per_session: int = 80           # Session 复用上限（0=不限制）
 
 
 class AnalysisSection(BaseModel):

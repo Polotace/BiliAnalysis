@@ -1,11 +1,25 @@
 """异步 HTTP 工具模块。函数式设计，Session 由调用方显式管理。"""
+import random
 from typing import Any
 import aiohttp
 from .ua import ua
 
-__all__ = ["HttpError", "create_session", "get", "post"]
+__all__ = ["HttpError", "BiliCodeError", "create_session", "get", "post"]
 
 DEFAULT_TIMEOUT = aiohttp.ClientTimeout(total=10, connect=3)
+
+# ── Header rotation pools ──
+_REFERERS = [
+    "https://www.bilibili.com/",
+    "https://www.bilibili.com/v/popular/weekly",
+    "https://www.bilibili.com/v/popular/weekly/1",
+    "https://www.bilibili.com/v/popular/rank/all",
+]
+_ACCEPT_LANGUAGES = [
+    "zh-CN,zh;q=0.9,en;q=0.8",
+    "zh-CN,zh;q=0.9",
+    "zh-CN,zh;q=0.9,en;q=0.8,ja;q=0.6",
+]
 
 
 class HttpError(Exception):
@@ -16,15 +30,39 @@ class HttpError(Exception):
         super().__init__(f"[{status}] {message}" if message else f"[{status}]")
 
 
+class BiliCodeError(HttpError):
+    """B站业务层面错误（code != 0 或特定错误码）"""
+    def __init__(self, status: int, bili_code: int, message: str = "") -> None:
+        self.bili_code = bili_code
+        super().__init__(status, f"code={bili_code} {message}")
+
+
+def _random_headers(cookie: str = "") -> dict[str, str]:
+    """生成带随机 Referer + Accept-Language 的请求头。"""
+    return {
+        "User-Agent": ua.random,
+        "Referer": random.choice(_REFERERS),
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": random.choice(_ACCEPT_LANGUAGES),
+        **({"Cookie": cookie} if cookie else {}),
+    }
+
+
 def create_session(
     timeout: aiohttp.ClientTimeout | None = None,
     cookie: str = "",
 ) -> aiohttp.ClientSession:
-    """创建预配置 Session：自动注入随机 UA header + 超时 + 可选 Cookie。"""
-    headers = {"User-Agent": ua.random}
-    if cookie:
-        headers["Cookie"] = cookie
-    return aiohttp.ClientSession(headers=headers, timeout=timeout or DEFAULT_TIMEOUT)
+    """创建预配置 Session：随机 UA + Referer + Accept-Language + 可选 Cookie。"""
+    return aiohttp.ClientSession(
+        headers=_random_headers(cookie),
+        timeout=timeout or DEFAULT_TIMEOUT,
+    )
+
+
+def rotate_session_headers(session: aiohttp.ClientSession, cookie: str = "") -> None:
+    """轮换 Session 的请求头（模拟新会话指纹）。"""
+    session.headers.clear()
+    session.headers.update(_random_headers(cookie))
 
 
 async def _request(

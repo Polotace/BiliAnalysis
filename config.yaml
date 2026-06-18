@@ -4,7 +4,7 @@
 
 # ── 爬虫 ──
 crawler:
-  mode: sequential           # sequential | concurrent
+  mode: concurrent           # sequential | concurrent
   concurrency: 3             # 并发模式下的最大并发数
   request_delay: 2.5         # 请求间隔（秒），含 ±1s 随机抖动
   max_retries: 3             # 单周最大重试次数

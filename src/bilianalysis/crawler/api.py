@@ -3,10 +3,18 @@ from typing import Any
 from urllib.parse import urlencode
 
 import aiohttp
-from bilianalysis.utils.fetch import get
+from bilianalysis.utils.fetch import get, BiliCodeError
 from bilianalysis.crawler.signer import WbiSigner
 
 BASE_URL = "https://api.bilibili.com/x/web-interface/popular/series"
+
+
+def _check_bili_code(resp: dict, url: str) -> None:
+    """检查 B站响应中的业务 code 字段。非 0 则抛 BiliCodeError。"""
+    code = resp.get("code", 0)
+    if code != 0:
+        msg = resp.get("message", "")
+        raise BiliCodeError(200, code, f"{url} → {msg}" if msg else url)
 
 
 async def list_series(
@@ -17,6 +25,7 @@ async def list_series(
     params = signer.sign({})
     url = f"{BASE_URL}/list?{urlencode(params)}"
     resp = await get(session, url)
+    _check_bili_code(resp, url)
     items: list[dict[str, Any]] = resp.get("data", {}).get("list", [])
     items.sort(key=lambda x: x.get("number", 0))
     return items
@@ -32,5 +41,6 @@ async def get_weekly_videos(
     params = signer.sign({"number": str(number)})
     url = f"{BASE_URL}/one?{urlencode(params)}"
     resp = await get(session, url)
+    _check_bili_code(resp, url)
     return resp.get("data", {})
 
