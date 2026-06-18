@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, HTTPException
 
 from bilianalysis.config.model import AppConfig
 from bilianalysis.engine.base import (
@@ -28,6 +28,19 @@ def _read_json(path: Path) -> dict | None:
         with open(path, encoding="utf-8") as f:
             return json.load(f)
     return None
+
+
+def _check_data_ready(config: AppConfig) -> None:
+    """Raise 503 if no processed data or cached reports exist yet."""
+    rd = _reports_dir(config)
+    pd = Path(config.data.processed_dir)
+    has_cache = (rd / "stats_report.json").exists()
+    has_parquet = (pd / "Weekly.parquet").exists()
+    if not has_cache and not has_parquet:
+        raise HTTPException(
+            status_code=503,
+            detail="暂无数据，请先触发一次数据采集与分析",
+        )
 
 
 @router.post("/analysis", status_code=202, response_model=TaskTriggerResponse)
@@ -81,7 +94,14 @@ async def get_stats(
     cached = _read_json(_reports_dir(config) / "stats_report.json")
     if cached:
         return StatReport(**cached)
-    return engine.statistics()
+    _check_data_ready(config)
+    try:
+        return engine.statistics()
+    except (FileNotFoundError, OSError):
+        raise HTTPException(
+            status_code=503,
+            detail="暂无数据，请先触发一次数据采集与分析",
+        )
 
 
 @router.get("/analysis/clusters", response_model=ClusterReport)
@@ -93,7 +113,14 @@ async def get_clusters(
     cached = _read_json(_reports_dir(config) / "cluster_report.json")
     if cached:
         return ClusterReport(**cached)
-    return engine.clustering()
+    _check_data_ready(config)
+    try:
+        return engine.clustering()
+    except (FileNotFoundError, OSError):
+        raise HTTPException(
+            status_code=503,
+            detail="暂无数据，请先触发一次数据采集与分析",
+        )
 
 
 @router.get("/analysis/predictions", response_model=PredictionReport)
@@ -105,4 +132,11 @@ async def get_predictions(
     cached = _read_json(_reports_dir(config) / "prediction_report.json")
     if cached:
         return PredictionReport(**cached)
-    return engine.prediction()
+    _check_data_ready(config)
+    try:
+        return engine.prediction()
+    except (FileNotFoundError, OSError):
+        raise HTTPException(
+            status_code=503,
+            detail="暂无数据，请先触发一次数据采集与分析",
+        )

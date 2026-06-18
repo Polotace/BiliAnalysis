@@ -11,7 +11,10 @@ const alova = createAlova({
   responded: {
     onSuccess: async (response) => {
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+        const body = await response.json().catch(() => ({}))
+        throw new Error(
+          (body as { detail?: string }).detail ?? `HTTP ${response.status}`,
+        )
       }
       return response.json()
     },
