@@ -49,11 +49,14 @@ def build_dwd(records_list: list[dict]) -> pd.DataFrame:
     dwd["up_name"] = dwd["creator_mid"].map(all_creators)
     dwd["category_name"] = dwd["category_tid"].map(all_categories)
 
-    # Derive rates (zero-safe: view=0 → rate=0.0)
+    # Derive rates (zero-safe: view=0 → rate=0.0; fill numerators to prevent NaN leak)
     view = dwd["view"].fillna(0).astype("int64")
-    dwd["like_rate"] = (dwd["like_cnt"] / view).where(view > 0, 0.0).astype("float64")
-    dwd["coin_rate"] = (dwd["coin"] / view).where(view > 0, 0.0).astype("float64")
-    dwd["favorite_rate"] = (dwd["favorite"] / view).where(view > 0, 0.0).astype("float64")
+    like_cnt = dwd["like_cnt"].fillna(0)
+    coin = dwd["coin"].fillna(0)
+    favorite = dwd["favorite"].fillna(0)
+    dwd["like_rate"] = (like_cnt / view).where(view > 0, 0.0).astype("float64")
+    dwd["coin_rate"] = (coin / view).where(view > 0, 0.0).astype("float64")
+    dwd["favorite_rate"] = (favorite / view).where(view > 0, 0.0).astype("float64")
 
     # Select columns and rename
     result = dwd[[
