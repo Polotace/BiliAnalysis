@@ -205,3 +205,55 @@ export interface CategorySummary {
   pid_name_v2: string | null
   video_count: number
 }
+
+// ── Admin ──
+
+export interface CrawlerStatus {
+  total_weeks: number
+  crawled: number
+  failed: Record<number, string>
+  last_run: string | null
+  is_running: boolean
+}
+
+export interface TaskTriggerResponse {
+  run_id: string
+  pipeline: string
+  status: string
+}
+
+export interface PipelineInfo {
+  name: string
+  schedule: string
+  steps: string[]
+  step_failure: string
+}
+
+export interface PipelineListResponse {
+  pipelines: PipelineInfo[]
+}
+
+export interface RunHistoryItem {
+  run_id: string
+  pipeline: string
+  trigger: string
+  started_at: string
+  finished_at: string | null
+  status: string
+  step_count: number
+  failed_step: string | null
+}
+
+export interface AnalysisOverview {
+  last_clean: Record<string, any> | null
+  last_stats: Record<string, any> | null
+  last_cluster: Record<string, any> | null
+  last_prediction: Record<string, any> | null
+}
+
+export interface AppConfigData {
+  crawler: Record<string, any>
+  analysis: Record<string, any>
+  data: Record<string, any>
+  scheduler: Record<string, any>
+}

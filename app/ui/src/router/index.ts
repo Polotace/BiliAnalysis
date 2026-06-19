@@ -58,6 +58,11 @@ const router = createRouter({
       name: 'categories',
       component: () => import('@/pages/browse/CategoriesPage.vue'),
     },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('@/pages/AdminPage.vue'),
+    },
   ],
   scrollBehavior() {
     return { top: 0 }

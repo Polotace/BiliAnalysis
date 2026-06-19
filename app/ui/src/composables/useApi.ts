@@ -8,6 +8,8 @@ import type {
   WeekItem, WeekDetail,
   CreatorSummary, CreatorDetail, PaginatedCreators,
   CategorySummary,
+  CrawlerStatus, TaskTriggerResponse, PipelineListResponse,
+  RunHistoryItem, AnalysisOverview, AppConfigData,
 } from '@/types/api'
 
 const alova = createAlova({
@@ -114,4 +116,47 @@ export function useCreatorDetail(mid: number) {
 
 export function useCategoriesList() {
   return useRequest(fetchCategories, { immediate: false })
+}
+
+// ── Admin ──
+
+export function fetchCrawlerStatus() {
+  return alova.Get<CrawlerStatus>('/crawler')
+}
+export function triggerCrawler() {
+  return alova.Post<TaskTriggerResponse>('/crawler')
+}
+export function triggerAnalysis() {
+  return alova.Post<TaskTriggerResponse>('/analysis')
+}
+export function triggerDbLoad() {
+  return alova.Post<Record<string, any>>('/db/load')
+}
+export function fetchAnalysisOverview() {
+  return alova.Get<AnalysisOverview>('/analysis')
+}
+export function fetchPipelineList() {
+  return alova.Get<PipelineListResponse>('/tasks')
+}
+export function triggerPipeline(name: string) {
+  return alova.Post<TaskTriggerResponse>(`/tasks/${name}/run`)
+}
+export function fetchPipelineHistory(name: string, limit: number = 20) {
+  return alova.Get<RunHistoryItem[]>(`/tasks/${name}/history`, { params: { limit } })
+}
+export function fetchAppConfig() {
+  return alova.Get<AppConfigData>('/config')
+}
+export function updateAppConfig(section: string, values: Record<string, any>, persist: boolean = false) {
+  return alova.Put<{ detail: string }>('/config', { section, values, persist })
+}
+
+export function useCrawlerStatus() {
+  return useRequest(fetchCrawlerStatus, { immediate: false })
+}
+export function useAnalysisOverview() {
+  return useRequest(fetchAnalysisOverview, { immediate: false })
+}
+export function usePipelineList() {
+  return useRequest(fetchPipelineList, { immediate: false })
 }
