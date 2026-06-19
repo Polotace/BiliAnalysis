@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { VideoSummary } from '@/types/api'
+import { proxyImage } from '@/composables/useImageProxy'
 
 defineProps<{ video: VideoSummary }>()
 
@@ -17,8 +18,8 @@ function fmt(n: number): string {
   >
     <div class="relative h-[180px] bg-border overflow-hidden">
       <img
-        v-if="video.cover_url"
-        :src="video.cover_url"
+        v-if="proxyImage(video.cover_url)"
+        :src="proxyImage(video.cover_url)!"
         :alt="video.title"
         class="w-full h-full object-cover"
         loading="lazy"

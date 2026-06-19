@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CreatorSummary } from '@/types/api'
+import { proxyImage } from '@/composables/useImageProxy'
 
 defineProps<{ creator: CreatorSummary }>()
 
@@ -16,8 +17,8 @@ function fmt(n: number): string {
            cursor-pointer no-underline"
   >
     <img
-      v-if="creator.face"
-      :src="creator.face"
+      v-if="proxyImage(creator.face)"
+      :src="proxyImage(creator.face)!"
       :alt="creator.name"
       class="w-12 h-12 rounded-full object-cover shrink-0"
     />

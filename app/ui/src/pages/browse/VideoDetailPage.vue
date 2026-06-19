@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useVideo } from '@/composables/useApi'
+import { proxyImage } from '@/composables/useImageProxy'
 import PageShell from '@/components/layout/PageShell.vue'
 
 const route = useRoute()
@@ -37,7 +38,7 @@ function fmtDuration(secs: number): string {
 
     <template v-else-if="data">
       <div class="relative h-[400px] rounded-[16px] overflow-hidden mb-8 bg-border">
-        <img v-if="data.cover_url" :src="data.cover_url" :alt="data.title"
+        <img v-if="proxyImage(data.cover_url)" :src="proxyImage(data.cover_url)!" :alt="data.title"
              class="w-full h-full object-cover" />
         <div v-else class="w-full h-full flex items-center justify-center text-text-secondary">暂无封面</div>
         <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
@@ -45,7 +46,7 @@ function fmtDuration(secs: number): string {
           <h1 class="text-2xl font-bold text-white mb-3 leading-snug">{{ data.title }}</h1>
           <div class="flex items-center gap-6 text-sm text-white/80">
             <router-link :to="`/creators/${data.creator_mid}`" class="flex items-center gap-2 hover:text-white no-underline">
-              <img v-if="data.creator_face" :src="data.creator_face" class="w-6 h-6 rounded-full" />
+              <img v-if="proxyImage(data.creator_face)" :src="proxyImage(data.creator_face)!" class="w-6 h-6 rounded-full" />
               <span>{{ data.creator_name }}</span>
             </router-link>
             <span>{{ fmtDuration(data.duration) }}</span>

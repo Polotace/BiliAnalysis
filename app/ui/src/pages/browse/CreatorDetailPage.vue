@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useCreatorDetail } from '@/composables/useApi'
+import { proxyImage } from '@/composables/useImageProxy'
 import PageShell from '@/components/layout/PageShell.vue'
 import VideoCard from '@/components/business/VideoCard.vue'
 
@@ -33,7 +34,7 @@ function fmt(n: number): string {
 
     <template v-else-if="data">
       <div class="bg-card rounded-[16px] p-10 mb-8 shadow-[var(--shadow-default)] flex items-start gap-6">
-        <img v-if="data.face" :src="data.face" :alt="data.name"
+        <img v-if="proxyImage(data.face)" :src="proxyImage(data.face)!" :alt="data.name"
              class="w-24 h-24 rounded-full object-cover shrink-0" />
         <div v-else class="w-24 h-24 rounded-full bg-border shrink-0 flex items-center justify-center text-text-secondary text-sm">UP</div>
         <div class="flex-1">
