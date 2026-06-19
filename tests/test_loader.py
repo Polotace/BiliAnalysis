@@ -17,7 +17,7 @@ from bilianalysis.etl.transform import transform_week
 
 TEST_DB_URL = os.environ.get(
     "BILIINSIGHT_TEST_DB_URL",
-    "postgresql+asyncpg://localhost:5432/biliinsight_test",
+    "postgresql+asyncpg://postgres:123456@localhost:5432/biliinsight_test",
 )
 
 
@@ -71,7 +71,8 @@ def week1_records():
 @pytest.mark.asyncio
 async def test_load_week_writes_all_tables(pg_session, week1_records):
     """load_week inserts records into all 6 tables."""
-    await load_week(pg_session, week1_records)
+    async with pg_session.begin():
+        await load_week(pg_session, week1_records)
 
     # Verify row counts — all 6 tables should have data
     from sqlalchemy import select, func
@@ -97,8 +98,10 @@ async def test_load_incremental_skips_existing(pg_session, week1_records):
 @pytest.mark.asyncio
 async def test_load_week_idempotent(pg_session, week1_records):
     """Loading the same week twice does not duplicate data."""
-    await load_week(pg_session, week1_records)
-    await load_week(pg_session, week1_records)  # should not raise
+    async with pg_session.begin():
+        await load_week(pg_session, week1_records)
+    async with pg_session.begin():
+        await load_week(pg_session, week1_records)  # should not raise
 
     from sqlalchemy import select, func
     result = await pg_session.execute(select(func.count()).select_from(WeeklyModel))

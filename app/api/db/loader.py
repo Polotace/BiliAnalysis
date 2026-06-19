@@ -37,60 +37,60 @@ async def load_week(
     pg_session: AsyncSession,
     records: dict[str, list[dict]],
 ) -> None:
-    """Insert one week's records into all 6 tables within a single transaction.
+    """Insert one week's records into all 6 tables.
 
+    Caller is responsible for transaction management (begin/commit/rollback).
     Insert order respects FK dependencies:
     weekly → creator → category → video → video_stat → weekly_video
     """
-    async with pg_session.begin():
-        # 1. weekly (single row, immutable)
-        w = WeeklyEntity.model_validate(records["weekly"][0])
+    # 1. weekly (single row, immutable)
+    w = WeeklyEntity.model_validate(records["weekly"][0])
+    await pg_session.execute(
+        pg_insert(WeeklyModel).values(w.model_dump()).on_conflict_do_nothing()
+    )
+
+    # 2. creators (immutable after first insert)
+    for c in records["creators"]:
+        ce = CreatorEntity.model_validate(c)
         await pg_session.execute(
-            pg_insert(WeeklyModel).values(w.model_dump()).on_conflict_do_nothing()
+            pg_insert(CreatorModel).values(ce.model_dump()).on_conflict_do_nothing()
         )
 
-        # 2. creators (immutable after first insert)
-        for c in records["creators"]:
-            ce = CreatorEntity.model_validate(c)
-            await pg_session.execute(
-                pg_insert(CreatorModel).values(ce.model_dump()).on_conflict_do_nothing()
-            )
+    # 3. categories (immutable after first insert)
+    for c in records["categories"]:
+        ce = CategoryEntity.model_validate(c)
+        await pg_session.execute(
+            pg_insert(CategoryModel).values(ce.model_dump()).on_conflict_do_nothing()
+        )
 
-        # 3. categories (immutable after first insert)
-        for c in records["categories"]:
-            ce = CategoryEntity.model_validate(c)
-            await pg_session.execute(
-                pg_insert(CategoryModel).values(ce.model_dump()).on_conflict_do_nothing()
+    # 4. videos (update on conflict — same video may reappear with changes)
+    for v in records["videos"]:
+        ve = VideoEntity.model_validate(v)
+        values = ve.model_dump()
+        await pg_session.execute(
+            pg_insert(VideoModel).values(values).on_conflict_do_update(
+                index_elements=["aid"],
+                set_={k: v for k, v in values.items() if k != "aid"},
             )
+        )
 
-        # 4. videos (update on conflict — same video may reappear with changes)
-        for v in records["videos"]:
-            ve = VideoEntity.model_validate(v)
-            values = ve.model_dump()
-            await pg_session.execute(
-                pg_insert(VideoModel).values(values).on_conflict_do_update(
-                    index_elements=["aid"],
-                    set_={k: v for k, v in values.items() if k != "aid"},
-                )
+    # 5. video_stats (update on conflict — stats change across weeks)
+    for vs in records["video_stats"]:
+        vse = VideoStatEntity.model_validate(vs)
+        values = vse.model_dump()
+        await pg_session.execute(
+            pg_insert(VideoStatModel).values(values).on_conflict_do_update(
+                index_elements=["aid"],
+                set_={k: v for k, v in values.items() if k != "aid"},
             )
+        )
 
-        # 5. video_stats (update on conflict — stats change across weeks)
-        for vs in records["video_stats"]:
-            vse = VideoStatEntity.model_validate(vs)
-            values = vse.model_dump()
-            await pg_session.execute(
-                pg_insert(VideoStatModel).values(values).on_conflict_do_update(
-                    index_elements=["aid"],
-                    set_={k: v for k, v in values.items() if k != "aid"},
-                )
-            )
-
-        # 6. weekly_videos (immutable)
-        for wv in records["weekly_videos"]:
-            wve = WeeklyVideoEntity.model_validate(wv)
-            await pg_session.execute(
-                pg_insert(WeeklyVideoModel).values(wve.model_dump()).on_conflict_do_nothing()
-            )
+    # 6. weekly_videos (immutable)
+    for wv in records["weekly_videos"]:
+        wve = WeeklyVideoEntity.model_validate(wv)
+        await pg_session.execute(
+            pg_insert(WeeklyVideoModel).values(wve.model_dump()).on_conflict_do_nothing()
+        )
 
 
 async def load_incremental(
@@ -99,6 +99,9 @@ async def load_incremental(
 ) -> dict:
     """Incremental load: query weekly table, skip existing weeks.
 
+    Each week is loaded in its own transaction so a single failure
+    doesn't affect other weeks.
+
     Args:
         pg_session: Database session.
         all_records: Output of load_raw_weeks().
@@ -106,7 +109,7 @@ async def load_incremental(
     Returns:
         {"loaded": [1, 2], "skipped": [3, 4], "failed": {5: "error message"}}
     """
-    # Query existing week numbers
+    # Query existing week numbers (auto-commit via implicit transaction)
     result = await pg_session.execute(select(WeeklyModel.number))
     existing = {row[0] for row in result.all()}
 
@@ -122,7 +125,8 @@ async def load_incremental(
             continue
 
         try:
-            await load_week(pg_session, records)
+            async with pg_session.begin():
+                await load_week(pg_session, records)
             loaded.append(week_num)
         except Exception as exc:
             logger.exception("Failed to load week %s: %s", week_num, exc)
