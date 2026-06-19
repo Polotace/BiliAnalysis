@@ -1,11 +1,36 @@
-"""FastAPI dependency injection for config, runner, and engine."""
+"""FastAPI dependency injection for config, runner, engine, and database sessions."""
 from typing import Annotated
 
 from fastapi import Request, Depends
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
+from app.api.config import ApiSettings
 from bilianalysis.config.model import AppConfig
 from bilianalysis.engine.base import AnalysisEngine
 from bilianalysis.scheduler.runner import PipelineRunner
+
+_engine = None
+_sessionmaker = None
+
+
+def _get_sessionmaker():
+    """Lazy-init the async engine and sessionmaker from ApiSettings."""
+    global _engine, _sessionmaker
+    if _engine is None:
+        settings = ApiSettings()
+        _engine = create_async_engine(
+            settings.database_url,
+            pool_size=settings.database_pool_size,
+        )
+        _sessionmaker = async_sessionmaker(_engine, expire_on_commit=False)
+    return _sessionmaker
+
+
+async def get_db():
+    """Yield an AsyncSession. Session lifecycle = request scope."""
+    sm = _get_sessionmaker()
+    async with sm() as session:
+        yield session
 
 
 def get_config(request: Request) -> AppConfig:
