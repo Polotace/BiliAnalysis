@@ -1,5 +1,6 @@
 """Tests for data warehouse layered builder."""
 import json
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -7,6 +8,7 @@ from bilianalysis.etl.transform import transform_week
 from bilianalysis.warehouse import WarehouseReport
 from bilianalysis.warehouse.dwd import build_dwd
 from bilianalysis.warehouse.report import SkippedWeek
+from bilianalysis.warehouse.builder import build_warehouse
 
 RAW_DIR = Path("data/raw")
 
@@ -337,3 +339,42 @@ def test_ads_empty_input():
     assert len(ads["ads_top_creators"]) == 0
     assert len(ads["ads_category_trend"]) == 0
     assert len(ads["ads_weekly_kpi"]) == 0
+
+
+# ---------------------------------------------------------------------------
+# Builder orchestration tests
+# ---------------------------------------------------------------------------
+
+
+def test_build_warehouse_end_to_end():
+    """Full pipeline with real data: 4 weeks → 8 parquet files."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        warehouse_dir = Path(tmpdir) / "warehouse"
+        report = build_warehouse(RAW_DIR, warehouse_dir)
+
+        assert isinstance(report, WarehouseReport)
+        assert report.weeks_processed >= 4
+        assert report.weeks_skipped == 0
+        assert len(report.tables_written) == 8
+        assert report.duration_seconds > 0
+
+        for table_name in report.tables_written:
+            assert (warehouse_dir / table_name).exists()
+
+        dwd = pd.read_parquet(warehouse_dir / "dwd_fact_video.parquet")
+        assert len(dwd) > 0
+        assert "weekly_number" in dwd.columns
+
+
+def test_build_warehouse_empty_dir():
+    """Empty raw_dir → report with 0 processed, no files written."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        raw_dir = Path(tmpdir) / "empty_raw"
+        raw_dir.mkdir()
+        warehouse_dir = Path(tmpdir) / "warehouse"
+
+        report = build_warehouse(raw_dir, warehouse_dir)
+
+        assert report.weeks_processed == 0
+        assert report.weeks_skipped == 0
+        assert report.tables_written == []
