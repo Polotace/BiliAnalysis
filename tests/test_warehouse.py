@@ -134,3 +134,96 @@ def test_build_dwd_type1_creator_name():
     names = dwd["up_name"].unique()
     assert len(names) == 1
     assert names[0] == "NewName"
+
+
+# ---------------------------------------------------------------------------
+# DWS layer tests
+# ---------------------------------------------------------------------------
+from bilianalysis.warehouse.dws import build_dws
+
+
+def test_build_dws_returns_three_tables():
+    """build_dws returns a dict with exactly 3 DataFrames."""
+    records_list = [_load_records(1)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+
+    assert set(dws.keys()) == {"dws_creator", "dws_category", "dws_weekly"}
+    assert all(isinstance(df, pd.DataFrame) for df in dws.values())
+
+
+def test_dws_creator_columns_and_grain():
+    """dws_creator has expected columns, one row per up_mid."""
+    records_list = [_load_records(1)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+
+    df = dws["dws_creator"]
+    expected = {
+        "up_mid", "up_name", "total_views", "total_likes",
+        "total_coins", "total_favorites",
+        "avg_view", "avg_like_rate", "avg_coin_rate",
+        "video_count", "unique_video_count",
+        "week_first", "week_last", "active_span",
+    }
+    assert set(df.columns) == expected
+    assert df["up_mid"].is_unique
+
+
+def test_dws_creator_aggregations():
+    """Verify aggregation values for a known creator."""
+    records_list = [_load_records(1), _load_records(2)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+
+    df = dws["dws_creator"]
+    assert (df["unique_video_count"] <= df["video_count"]).all()
+    assert (df["active_span"] >= 1).all()
+
+
+def test_dws_category_columns_and_grain():
+    """dws_category has expected columns, one row per category_tid."""
+    records_list = [_load_records(1), _load_records(2)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+
+    df = dws["dws_category"]
+    expected = {
+        "category_tid", "category_name", "total_views",
+        "avg_view_per_video", "avg_like_rate",
+        "video_count", "unique_creator_count",
+    }
+    assert set(df.columns) == expected
+    assert df["category_tid"].is_unique
+
+
+def test_dws_weekly_columns_and_grain():
+    """dws_weekly has expected columns, one row per weekly_number."""
+    records_list = [_load_records(1), _load_records(2)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+
+    df = dws["dws_weekly"]
+    expected = {
+        "weekly_number", "total_views", "avg_view_per_video",
+        "video_count", "creator_count", "category_count",
+        "total_likes", "total_coins", "total_favorites",
+    }
+    assert set(df.columns) == expected
+    assert df["weekly_number"].is_unique
+    assert len(df) >= 2
+
+
+def test_dws_empty_dwd():
+    """build_dws on empty DWD returns empty tables with correct columns."""
+    empty_dwd = pd.DataFrame(columns=[
+        "weekly_number", "aid", "bvid", "title", "duration", "pubdate",
+        "up_mid", "up_name", "category_tid", "category_name",
+        "view", "like_cnt", "coin", "favorite", "share", "reply", "danmaku",
+        "like_rate", "coin_rate", "favorite_rate",
+    ])
+    dws = build_dws(empty_dwd)
+
+    assert len(dws["dws_creator"]) == 0
+    assert len(dws["dws_category"]) == 0
+    assert len(dws["dws_weekly"]) == 0
