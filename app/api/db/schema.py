@@ -15,7 +15,7 @@ class Base(DeclarativeBase):
 class WeeklyModel(Base):
     __tablename__ = "weekly"
 
-    number: Mapped[int] = mapped_column(Integer, primary_key=True)
+    number: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     subject: Mapped[str | None] = mapped_column(Text, nullable=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     label: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -35,9 +35,9 @@ class CreatorModel(Base):
 class CategoryModel(Base):
     __tablename__ = "category"
 
-    tid: Mapped[int] = mapped_column(Integer, primary_key=True)
+    tid: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     tname: Mapped[str | None] = mapped_column(Text, nullable=True)
-    tid_v2: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    tid_v2: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     tname_v2: Mapped[str | None] = mapped_column(Text, nullable=True)
     pid_v2: Mapped[int | None] = mapped_column(Integer, nullable=True)
     pid_name_v2: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -46,13 +46,13 @@ class CategoryModel(Base):
 class VideoModel(Base):
     __tablename__ = "video"
 
-    aid: Mapped[int] = mapped_column(Integer, primary_key=True)
+    aid: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     bvid: Mapped[str | None] = mapped_column(Text, nullable=True)
     title: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     duration: Mapped[int | None] = mapped_column(Integer, nullable=True)
     pubdate: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-    cid: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    cid: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     video_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     copyright: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -63,7 +63,7 @@ class VideoModel(Base):
 class VideoStatModel(Base):
     __tablename__ = "video_stat"
 
-    aid: Mapped[int] = mapped_column(ForeignKey("video.aid"), primary_key=True)
+    aid: Mapped[int] = mapped_column(BigInteger, ForeignKey("video.aid"), primary_key=True)
     view: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     like_cnt: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     coin: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
@@ -76,8 +76,8 @@ class VideoStatModel(Base):
 class WeeklyVideoModel(Base):
     __tablename__ = "weekly_video"
 
-    weekly_number: Mapped[int] = mapped_column(ForeignKey("weekly.number"), primary_key=True)
-    aid: Mapped[int] = mapped_column(ForeignKey("video.aid"), primary_key=True)
+    weekly_number: Mapped[int] = mapped_column(BigInteger, ForeignKey("weekly.number"), primary_key=True)
+    aid: Mapped[int] = mapped_column(BigInteger, ForeignKey("video.aid"), primary_key=True)
 
 
 # ═══ Pydantic Entities (used for validation in loader) ═══
