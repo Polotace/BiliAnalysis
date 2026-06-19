@@ -3,7 +3,8 @@ import json
 import logging
 from pathlib import Path
 
-from sqlalchemy import select, insert
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bilianalysis.etl import transform_week
@@ -45,21 +46,21 @@ async def load_week(
         # 1. weekly (single row, immutable)
         w = WeeklyEntity.model_validate(records["weekly"][0])
         await pg_session.execute(
-            insert(WeeklyModel).values(w.model_dump()).on_conflict_do_nothing()
+            pg_insert(WeeklyModel).values(w.model_dump()).on_conflict_do_nothing()
         )
 
         # 2. creators (immutable after first insert)
         for c in records["creators"]:
             ce = CreatorEntity.model_validate(c)
             await pg_session.execute(
-                insert(CreatorModel).values(ce.model_dump()).on_conflict_do_nothing()
+                pg_insert(CreatorModel).values(ce.model_dump()).on_conflict_do_nothing()
             )
 
         # 3. categories (immutable after first insert)
         for c in records["categories"]:
             ce = CategoryEntity.model_validate(c)
             await pg_session.execute(
-                insert(CategoryModel).values(ce.model_dump()).on_conflict_do_nothing()
+                pg_insert(CategoryModel).values(ce.model_dump()).on_conflict_do_nothing()
             )
 
         # 4. videos (update on conflict — same video may reappear with changes)
@@ -67,7 +68,7 @@ async def load_week(
             ve = VideoEntity.model_validate(v)
             values = ve.model_dump()
             await pg_session.execute(
-                insert(VideoModel).values(values).on_conflict_do_update(
+                pg_insert(VideoModel).values(values).on_conflict_do_update(
                     index_elements=["aid"],
                     set_={k: v for k, v in values.items() if k != "aid"},
                 )
@@ -78,7 +79,7 @@ async def load_week(
             vse = VideoStatEntity.model_validate(vs)
             values = vse.model_dump()
             await pg_session.execute(
-                insert(VideoStatModel).values(values).on_conflict_do_update(
+                pg_insert(VideoStatModel).values(values).on_conflict_do_update(
                     index_elements=["aid"],
                     set_={k: v for k, v in values.items() if k != "aid"},
                 )
@@ -88,7 +89,7 @@ async def load_week(
         for wv in records["weekly_videos"]:
             wve = WeeklyVideoEntity.model_validate(wv)
             await pg_session.execute(
-                insert(WeeklyVideoModel).values(wve.model_dump()).on_conflict_do_nothing()
+                pg_insert(WeeklyVideoModel).values(wve.model_dump()).on_conflict_do_nothing()
             )
 
 
