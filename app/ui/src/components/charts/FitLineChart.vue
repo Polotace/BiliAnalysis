@@ -9,9 +9,9 @@ const props = defineProps<{ result: PredictionResult }>()
 const chartRef: Ref<HTMLElement | null> = ref(null)
 
 const option = computed<EChartsOption>(() => {
-  const fitted = props.result.fitted as { week: number; actual: number; predicted: number }[]
-  const forecast = props.result.forecast as { week: number; predicted: number }[]
-  const allWeeks = [...fitted.map(f => f.week), ...forecast.map(f => f.week)]
+  const fitted = props.result.fitted as { week_number: number; actual: number; predicted: number }[]
+  const forecast = props.result.forecast as { week_number: number; predicted: number }[]
+  const allWeeks = [...fitted.map(f => f.week_number), ...forecast.map(f => f.week_number)]
   const splitIdx = fitted.length
 
   return {

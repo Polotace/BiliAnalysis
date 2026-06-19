@@ -16,7 +16,7 @@ function fmt(v: number): string {
       <StatCard
         v-for="(f, i) in forecast.slice(0, 3)"
         :key="i"
-        :label="`第${f.week}期预测`"
+        :label="`第${f.week_number}期预测`"
         :value="fmt(f.predicted)"
         :sub-label="i === 0 ? '下周' : i === 1 ? '两周后' : '三周后'"
       />

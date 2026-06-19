@@ -82,8 +82,8 @@ export interface PredictionResult {
   mae: number
   coefficients: Record<string, number>
   intercept: number
-  fitted: Record<string, any>[]
-  forecast: Record<string, any>[]
+  fitted: { week_number: number; actual: number; predicted: number }[]
+  forecast: { week_number: number; predicted: number }[]
 }
 
 export interface PredictionReport {
