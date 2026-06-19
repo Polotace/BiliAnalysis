@@ -12,21 +12,22 @@ Architecture design: `docs/new-scheme.md` | Original plan: `docs/README.md` | De
 
 ## Commands
 
-| Command | Purpose |
-|---------|---------|
-| `uv sync` | Install all dependencies |
-| `uv add <pkg>` | Add a runtime dependency |
-| `uv add --dev <pkg>` | Add a dev dependency |
-| `uv run pytest tests/ -v` | Run all 109 tests |
-| `uv run pytest tests/test_storage.py -v` | Run a single test file |
-| `uv run pytest tests/test_pipeline.py::TestRun::test_concurrent_mode -v` | Run a single test |
-| `uv run pytest tests/ -v -k "crawl"` | Run tests matching keyword |
-| `uv run python -c "..."` | Run inline Python with venv |
-| `cd app/ui && pnpm dev` | Start frontend dev server |
-| `cd app/ui && pnpm build` | Build frontend for production |
-| `cd app/ui && pnpm test:unit` | Run Vitest unit tests |
-| `cd app/ui && pnpm test:e2e` | Run Playwright e2e visual tests |
-| `uv run uvicorn app.api.app:create_app --reload` | Start FastAPI dev server |
+| Command                                                                  | Purpose                           |
+|--------------------------------------------------------------------------|-----------------------------------|
+| `uv sync`                                                                | Install all dependencies          |
+| `uv add <pkg>`                                                           | Add a runtime dependency          |
+| `uv add --dev <pkg>`                                                     | Add a dev dependency              |
+| `uv run pytest tests/ -v`                                                | Run all 109 tests                 |
+| `uv run pytest tests/test_storage.py -v`                                 | Run a single test file            |
+| `uv run pytest tests/test_pipeline.py::TestRun::test_concurrent_mode -v` | Run a single test                 |
+| `uv run pytest tests/ -v -k "crawl"`                                     | Run tests matching keyword        |
+| `uv run python -c "..."`                                                 | Run inline Python with venv       |
+| `uv run mypy .`                                                          | Run static type checking for code |
+| `cd app/ui && pnpm dev`                                                  | Start frontend dev server         |
+| `cd app/ui && pnpm build`                                                | Build frontend for production     |
+| `cd app/ui && pnpm test:unit`                                            | Run Vitest unit tests             |
+| `cd app/ui && pnpm test:e2e`                                             | Run Playwright e2e visual tests   |
+| `uv run uvicorn api.app:create_app --reload`                             | Start FastAPI dev server          |
 
 ## Architecture
 
@@ -186,6 +187,7 @@ Global config does NOT include database settings — those belong to the FastAPI
 - `sqlalchemy[asyncio]` + `asyncpg` — [planned] PostgreSQL integration
 - Vue3 + Element Plus + ECharts + Alova + TailwindCSS 4 — frontend (app/ui/)
 - `vitest` + `@playwright/test` — frontend tests
+- `mypy` — static type checking
 
 ## Testing
 
@@ -195,3 +197,4 @@ Global config does NOT include database settings — those belong to the FastAPI
 - Module-level test constants (`SERIES_LIST`, `WEEKLY_DATA`) shared across test classes
 - Engine tests verify all 4 analysis steps produce valid report models
 - Scheduler tests mock individual tasks and verify pipeline failure modes (stop/skip/retry)
+- After test or before the end, uses `mypy` tool to check code about static type

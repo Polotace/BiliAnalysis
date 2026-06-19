@@ -91,3 +91,117 @@ export interface PredictionReport {
   like_predict: PredictionResult
   duration_seconds: number
 }
+
+// ── Videos (browse) ──
+
+export interface VideoSummary {
+  aid: number
+  bvid: string
+  title: string
+  cover_url: string | null
+  duration: number
+  pubdate: string
+  creator_name: string | null
+  category_name: string | null
+  view: number
+  like_cnt: number
+}
+
+export interface VideoDetail {
+  aid: number
+  bvid: string
+  title: string
+  description: string | null
+  duration: number
+  pubdate: string
+  cid: number
+  video_url: string | null
+  cover_url: string | null
+  copyright: number
+  creator_mid: number
+  creator_name: string | null
+  creator_face: string | null
+  category_tid: number
+  category_name: string | null
+  category_v2_name: string | null
+  view: number
+  like_cnt: number
+  coin: number
+  favorite: number
+  share: number
+  reply: number
+  danmaku: number
+  appeared_weeks: number[]
+}
+
+export interface PaginatedVideos {
+  videos: VideoSummary[]
+  total: number
+  page: number
+  page_size: number
+}
+
+// ── Weeks (browse) ──
+
+export interface WeekItem {
+  number: number
+  subject: string | null
+  name: string | null
+  label: string | null
+  cover: string | null
+  start_time: string | null
+  end_time: string | null
+  video_count: number
+}
+
+export interface WeekDetail {
+  number: number
+  subject: string | null
+  name: string | null
+  label: string | null
+  cover: string | null
+  start_time: string | null
+  end_time: string | null
+  videos: VideoSummary[]
+}
+
+// ── Creators (browse) ──
+
+export interface CreatorSummary {
+  mid: number
+  name: string
+  face: string | null
+  video_count: number
+  total_views: number
+}
+
+export interface CreatorDetail {
+  mid: number
+  name: string
+  face: string | null
+  video_count: number
+  total_views: number
+  total_likes: number
+  total_coins: number
+  total_favorites: number
+  videos: VideoSummary[]
+}
+
+export interface PaginatedCreators {
+  creators: CreatorSummary[]
+  total: number
+  page: number
+  page_size: number
+}
+
+// ── Categories (browse) ──
+
+export interface CategorySummary {
+  tid: number
+  tname: string | null
+  tid_v2: number | null
+  tname_v2: string | null
+  pid_v2: number | null
+  pid_name_v2: string | null
+  video_count: number
+}

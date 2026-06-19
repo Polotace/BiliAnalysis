@@ -16,7 +16,7 @@ def serve(
     """
     import uvicorn
     from bilianalysis.config import load_config
-    from app.api import create_app
+    from api import create_app
 
     config = load_config(config_path)
     app = create_app(config)

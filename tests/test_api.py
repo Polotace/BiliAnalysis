@@ -3,7 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from bilianalysis.config.model import AppConfig
-from app.api import create_app
+from api import create_app
 
 
 @pytest.fixture

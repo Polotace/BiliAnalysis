@@ -19,6 +19,7 @@ dependencies = [
     "scikit-learn>=1.9.0",
     "sqlalchemy[asyncio]>=2.0.0",
     "typer>=0.26.7",
+    "types-pyyaml>=6.0.12.20260518",
     "uvicorn>=0.49.0",
 ]
 
@@ -30,6 +31,7 @@ spark = [
 [dependency-groups]
 dev = [
     "httpx2>=0.4.0",
+    "mypy>=2.1.0",
     "pyspark>=4.1.2",
     "pytest>=9.1.0",
     "pytest-asyncio>=1.4.0",
@@ -40,11 +42,11 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/bilianalysis", "app"]
+packages = ["src/bilianalysis", "app/api", "app/cli"]
 
 [project.scripts]
-bilianalysis = "app.cli:app"
-bilianalysis-serve = "app.cli.serve_cmd:serve"
+bilianalysis = "cli:app"
+bilianalysis-serve = "cli.serve_cmd:serve"
 
 [build-system]
 requires = ["hatchling"]

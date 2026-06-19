@@ -234,6 +234,7 @@ async def get_videos(
     page_size: int = 20,
     week_number: int | None = None,
     category_tid: int | None = None,
+    creator_mid: int | None = None,
     search: str | None = None,
     sort_by: str = "view",
 ) -> PaginatedVideos:
@@ -244,6 +245,7 @@ async def get_videos(
         page_size: Items per page (clamped 1–100).
         week_number: Filter by week.
         category_tid: Filter by category.
+        creator_mid: Filter by creator/UP主.
         search: Title substring search (ILIKE).
         sort_by: "view" (default), "like", "pubdate".
     """
@@ -259,6 +261,8 @@ async def get_videos(
         conditions.append(WeeklyVideoModel.weekly_number == week_number)
     if category_tid is not None:
         conditions.append(VideoModel.category_tid == category_tid)
+    if creator_mid is not None:
+        conditions.append(VideoModel.creator_mid == creator_mid)
     if search:
         conditions.append(VideoModel.title.ilike(f"%{search}%"))
 

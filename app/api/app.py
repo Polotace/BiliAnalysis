@@ -49,10 +49,21 @@ def create_app(config: AppConfig) -> FastAPI:
     )
 
     # Register routes
-    from api.router import crawler, analysis, tasks, config as config_router
+    from api.router import analysis
+    from api.router import categories
+    from api.router import config as config_router
+    from api.router import crawler
+    from api.router import creators
+    from api.router import tasks
+    from api.router import videos
+    from api.router import weeks
+    app.include_router(categories.router, prefix="/api")
     app.include_router(crawler.router, prefix="/api")
+    app.include_router(creators.router, prefix="/api")
     app.include_router(analysis.router, prefix="/api")
     app.include_router(tasks.router, prefix="/api")
+    app.include_router(videos.router, prefix="/api")
+    app.include_router(weeks.router, prefix="/api")
     app.include_router(config_router.router, prefix="/api")
 
     from api.router import db_load

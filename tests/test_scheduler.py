@@ -289,7 +289,7 @@ class TestCronService:
 
 
 from typer.testing import CliRunner
-from app.cli import app as cli_app
+from cli import app as cli_app
 import sys
 
 

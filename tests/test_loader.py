@@ -8,11 +8,11 @@ import os
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
-from app.api.db.schema import (
+from api.db.schema import (
     Base, WeeklyModel, CreatorModel, CategoryModel,
     VideoModel, VideoStatModel, WeeklyVideoModel,
 )
-from app.api.db.loader import load_week, load_incremental
+from api.db.loader import load_week, load_incremental
 from bilianalysis.etl.transform import transform_week
 
 TEST_DB_URL = os.environ.get(
@@ -98,10 +98,8 @@ async def test_load_incremental_skips_existing(pg_session, week1_records):
 @pytest.mark.asyncio
 async def test_load_week_idempotent(pg_session, week1_records):
     """Loading the same week twice does not duplicate data."""
-    async with pg_session.begin():
-        await load_week(pg_session, week1_records)
-    async with pg_session.begin():
-        await load_week(pg_session, week1_records)  # should not raise
+    await load_week(pg_session, week1_records)
+    await load_week(pg_session, week1_records)  # should not raise
 
     from sqlalchemy import select, func
     result = await pg_session.execute(select(func.count()).select_from(WeeklyModel))

@@ -2,7 +2,13 @@ import { createAlova } from 'alova'
 import adapterFetch from 'alova/fetch'
 import vueHook from 'alova/vue'
 import { useRequest } from 'alova/client'
-import type { StatReport, ClusterReport, PredictionReport } from '@/types/api'
+import type {
+  StatReport, ClusterReport, PredictionReport,
+  VideoSummary, VideoDetail, PaginatedVideos,
+  WeekItem, WeekDetail,
+  CreatorSummary, CreatorDetail, PaginatedCreators,
+  CategorySummary,
+} from '@/types/api'
 
 const alova = createAlova({
   baseURL: '/api',
@@ -35,6 +41,39 @@ export function fetchPredictions() {
   return alova.Get<PredictionReport>('/analysis/predictions')
 }
 
+// ── Videos ──
+
+export function fetchVideos(params?: Record<string, any>) {
+  return alova.Get<PaginatedVideos>('/videos', { params: params ?? {} })
+}
+export function fetchVideo(aid: number) {
+  return alova.Get<VideoDetail>(`/videos/${aid}`)
+}
+
+// ── Weeks ──
+
+export function fetchWeeks() {
+  return alova.Get<WeekItem[]>('/weeks')
+}
+export function fetchWeek(number: number) {
+  return alova.Get<WeekDetail>(`/weeks/${number}`)
+}
+
+// ── Creators ──
+
+export function fetchCreators(params?: Record<string, any>) {
+  return alova.Get<PaginatedCreators>('/creators', { params: params ?? {} })
+}
+export function fetchCreator(mid: number) {
+  return alova.Get<CreatorDetail>(`/creators/${mid}`)
+}
+
+// ── Categories ──
+
+export function fetchCategories() {
+  return alova.Get<CategorySummary[]>('/categories')
+}
+
 // ── Composables (per-page usage) ──
 
 export function useStats() {
@@ -47,4 +86,32 @@ export function useClusters() {
 
 export function usePredictions() {
   return useRequest(fetchPredictions, { immediate: false })
+}
+
+export function useVideos(params?: Record<string, any>) {
+  return useRequest(() => fetchVideos(params), { immediate: false })
+}
+
+export function useVideo(aid: number) {
+  return useRequest(() => fetchVideo(aid), { immediate: false })
+}
+
+export function useWeeksList() {
+  return useRequest(fetchWeeks, { immediate: false })
+}
+
+export function useWeekDetail(number: number) {
+  return useRequest(() => fetchWeek(number), { immediate: false })
+}
+
+export function useCreatorsList(params?: Record<string, any>) {
+  return useRequest(() => fetchCreators(params), { immediate: false })
+}
+
+export function useCreatorDetail(mid: number) {
+  return useRequest(() => fetchCreator(mid), { immediate: false })
+}
+
+export function useCategoriesList() {
+  return useRequest(fetchCategories, { immediate: false })
 }
