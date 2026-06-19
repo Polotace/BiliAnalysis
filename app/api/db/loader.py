@@ -109,9 +109,10 @@ async def load_incremental(
     Returns:
         {"loaded": [1, 2], "skipped": [3, 4], "failed": {5: "error message"}}
     """
-    # Query existing week numbers (auto-commit via implicit transaction)
-    result = await pg_session.execute(select(WeeklyModel.number))
-    existing = {row[0] for row in result.all()}
+    # Query existing week numbers in a short-lived transaction
+    async with pg_session.begin():
+        result = await pg_session.execute(select(WeeklyModel.number))
+        existing = {row[0] for row in result.all()}
 
     loaded: list[int] = []
     skipped: list[int] = []
