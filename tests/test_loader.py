@@ -1,6 +1,12 @@
-"""Integration tests for db/loader.py — requires PostgreSQL."""
+"""Integration tests for db/loader.py — requires PostgreSQL.
+
+Set BILIINSIGHT_TEST_DB_URL env var to point at a test database.
+Tests are skipped if no PostgreSQL is reachable.
+"""
+import os
+
 import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from app.api.db.schema import (
     Base, WeeklyModel, CreatorModel, CategoryModel,
@@ -9,13 +15,34 @@ from app.api.db.schema import (
 from app.api.db.loader import load_week, load_incremental
 from bilianalysis.etl.transform import transform_week
 
-# Use a real PG connection — skip if not available.
-# Set BILIINSIGHT_TEST_DB_URL env var to point at a test database.
-TEST_DB_URL = "postgresql+asyncpg://localhost:5432/biliinsight_test"
+TEST_DB_URL = os.environ.get(
+    "BILIINSIGHT_TEST_DB_URL",
+    "postgresql+asyncpg://localhost:5432/biliinsight_test",
+)
+
+
+async def _pg_is_reachable() -> bool:
+    """Return True if the test database is reachable."""
+    try:
+        engine = create_async_engine(TEST_DB_URL)
+        async with engine.begin() as conn:
+            await conn.run_sync(lambda c: None)
+        await engine.dispose()
+        return True
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="module")
+def _pg_available():
+    """Module-scoped check: skip all tests if PG is unreachable."""
+    import asyncio
+    if not asyncio.run(_pg_is_reachable()):
+        pytest.skip("PostgreSQL not available", allow_module_level=True)
 
 
 @pytest.fixture
-async def pg_session():
+async def pg_session(_pg_available):
     """Create tables, yield session, drop tables after."""
     engine = create_async_engine(TEST_DB_URL)
 
