@@ -27,7 +27,7 @@ class WeeklyModel(Base):
 class CreatorModel(Base):
     __tablename__ = "creator"
 
-    mid: Mapped[int] = mapped_column(Integer, primary_key=True)
+    mid: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name: Mapped[str | None] = mapped_column(Text, nullable=True)
     face: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -56,8 +56,8 @@ class VideoModel(Base):
     video_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     cover_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     copyright: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    creator_mid: Mapped[int | None] = mapped_column(ForeignKey("creator.mid"), nullable=True)
-    category_tid: Mapped[int | None] = mapped_column(ForeignKey("category.tid"), nullable=True)
+    creator_mid: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("creator.mid"), nullable=True)
+    category_tid: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("category.tid"), nullable=True)
 
 
 class VideoStatModel(Base):
