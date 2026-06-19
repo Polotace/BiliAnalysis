@@ -227,3 +227,113 @@ def test_dws_empty_dwd():
     assert len(dws["dws_creator"]) == 0
     assert len(dws["dws_category"]) == 0
     assert len(dws["dws_weekly"]) == 0
+
+
+# ---------------------------------------------------------------------------
+# ADS layer tests
+# ---------------------------------------------------------------------------
+from bilianalysis.warehouse.ads import build_ads
+
+
+def test_build_ads_returns_four_tables():
+    """build_ads returns a dict with exactly 4 DataFrames."""
+    records_list = [_load_records(1), _load_records(2)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+    ads = build_ads(dws, dwd)
+
+    assert set(ads.keys()) == {
+        "ads_hot_videos", "ads_top_creators",
+        "ads_category_trend", "ads_weekly_kpi",
+    }
+    assert all(isinstance(df, pd.DataFrame) for df in ads.values())
+
+
+def test_ads_hot_videos_deduped():
+    """ads_hot_videos has one row per unique video, no weekly_number."""
+    records_list = [_load_records(1), _load_records(2)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+    ads = build_ads(dws, dwd)
+
+    df = ads["ads_hot_videos"]
+    assert df["aid"].is_unique
+    assert "weekly_number" not in df.columns
+    expected_cols = {"aid", "bvid", "title", "up_mid", "up_name",
+                     "category_name", "view", "like_cnt", "coin",
+                     "favorite", "like_rate", "coin_rate", "pubdate"}
+    assert set(df.columns) == expected_cols
+
+
+def test_ads_hot_videos_sorted_by_view():
+    """ads_hot_videos is sorted by view descending."""
+    records_list = [_load_records(1), _load_records(2)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+    ads = build_ads(dws, dwd)
+
+    df = ads["ads_hot_videos"]
+    views = df["view"].tolist()
+    assert views == sorted(views, reverse=True)
+
+
+def test_ads_top_creators_sorted():
+    """ads_top_creators is sorted by total_views descending."""
+    records_list = [_load_records(1), _load_records(2)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+    ads = build_ads(dws, dwd)
+
+    df = ads["ads_top_creators"]
+    views = df["total_views"].tolist()
+    assert views == sorted(views, reverse=True)
+
+
+def test_ads_category_trend_columns():
+    """ads_category_trend has cross-product (category, week) grain."""
+    records_list = [_load_records(1), _load_records(2)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+    ads = build_ads(dws, dwd)
+
+    df = ads["ads_category_trend"]
+    expected = {"weekly_number", "category_name", "video_count", "total_views", "avg_like_rate"}
+    assert set(df.columns) == expected
+
+
+def test_ads_weekly_kpi_columns():
+    """ads_weekly_kpi has one row per week with KPI columns."""
+    records_list = [_load_records(1), _load_records(2)]
+    dwd = build_dwd(records_list)
+    dws = build_dws(dwd)
+    ads = build_ads(dws, dwd)
+
+    df = ads["ads_weekly_kpi"]
+    expected = {
+        "weekly_number", "total_views", "avg_view_per_video",
+        "video_count", "creator_count", "category_count",
+        "avg_like_rate", "avg_coin_rate",
+    }
+    assert set(df.columns) == expected
+    assert len(df) >= 2
+
+
+def test_ads_empty_input():
+    """build_ads on empty DWD/DWS returns empty tables with correct columns."""
+    empty_dwd = pd.DataFrame(columns=[
+        "weekly_number", "aid", "bvid", "title", "duration", "pubdate",
+        "up_mid", "up_name", "category_tid", "category_name",
+        "view", "like_cnt", "coin", "favorite", "share", "reply", "danmaku",
+        "like_rate", "coin_rate", "favorite_rate",
+    ])
+    empty_dws = {
+        "dws_creator": pd.DataFrame(),
+        "dws_category": pd.DataFrame(),
+        "dws_weekly": pd.DataFrame(),
+    }
+    ads = build_ads(empty_dws, empty_dwd)
+
+    assert len(ads["ads_hot_videos"]) == 0
+    assert len(ads["ads_top_creators"]) == 0
+    assert len(ads["ads_category_trend"]) == 0
+    assert len(ads["ads_weekly_kpi"]) == 0
