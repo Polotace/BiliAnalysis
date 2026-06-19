@@ -1,6 +1,7 @@
 """FastAPI application factory."""
 import logging
 from collections import deque
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +23,18 @@ def create_app(config: AppConfig) -> FastAPI:
     Returns:
         A FastAPI app ready for uvicorn.run().
     """
-    app = FastAPI(title="BiliAnalysis API", version="0.1.0")
+    @asynccontextmanager
+    async def _lifespan(app: FastAPI):
+        """Startup: create DB tables if they don't exist. Shutdown: no-op."""
+        from app.api.deps import _get_sessionmaker
+        from app.api.db.schema import Base
+        sm = _get_sessionmaker()
+        async with sm() as session:
+            async with session.bind.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+        yield
+
+    app = FastAPI(title="BiliAnalysis API", version="0.1.0", lifespan=_lifespan)
 
     # Runtime shared state
     app.state.config = config
@@ -45,16 +57,6 @@ def create_app(config: AppConfig) -> FastAPI:
 
     from app.api.router import db_load
     app.include_router(db_load.router, prefix="/api")
-
-    @app.on_event("startup")
-    async def _init_db():
-        """Create tables if they don't exist."""
-        from app.api.deps import _get_sessionmaker
-        from app.api.db.schema import Base
-        sm = _get_sessionmaker()
-        async with sm() as session:
-            async with session.bind.begin() as conn:
-                await conn.run_sync(Base.metadata.create_all)
 
     # Register error handlers
     _register_error_handlers(app)
