@@ -43,6 +43,19 @@ def create_app(config: AppConfig) -> FastAPI:
     app.include_router(tasks.router, prefix="/api")
     app.include_router(config_router.router, prefix="/api")
 
+    from app.api.router import db_load
+    app.include_router(db_load.router, prefix="/api")
+
+    @app.on_event("startup")
+    async def _init_db():
+        """Create tables if they don't exist."""
+        from app.api.deps import _get_sessionmaker
+        from app.api.db.schema import Base
+        sm = _get_sessionmaker()
+        async with sm() as session:
+            async with session.bind.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
     # Register error handlers
     _register_error_handlers(app)
 
