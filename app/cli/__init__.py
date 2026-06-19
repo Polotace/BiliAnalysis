@@ -7,11 +7,11 @@ app = typer.Typer(name="bilianalysis", help="Bilibili Weekly Must-Watch Data Ana
 
 def _register_schedule():
     """Lazy-register schedule subcommand."""
-    from app.cli.schedule_cmd import schedule_app
+    from cli.schedule_cmd import schedule_app
     app.add_typer(schedule_app, name="schedule", help="Scheduler management")
 
 
 _register_schedule()
 
-from app.cli.serve_cmd import serve_app
+from cli.serve_cmd import serve_app
 app.add_typer(serve_app, name="serve", help="Start API server")

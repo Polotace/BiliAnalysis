@@ -8,7 +8,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bilianalysis.etl import transform_week
-from app.api.db.schema import (
+from api.db.schema import (
     WeeklyModel, CreatorModel, CategoryModel, VideoModel,
     VideoStatModel, WeeklyVideoModel,
     WeeklyEntity, CreatorEntity, CategoryEntity, VideoEntity,

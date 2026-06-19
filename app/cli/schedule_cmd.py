@@ -10,7 +10,7 @@ from bilianalysis.config import load_config
 from bilianalysis.scheduler.registry import list_tasks, get_task
 from bilianalysis.scheduler.runner import PipelineRunner
 import bilianalysis.scheduler.builtins  # noqa: F401  (triggers task registration)
-from app.cli.utils import (
+from cli.utils import (
     console, make_task_table, make_pipeline_table,
 )
 

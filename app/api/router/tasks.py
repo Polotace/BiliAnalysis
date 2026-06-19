@@ -8,9 +8,9 @@ from fastapi import APIRouter, Request, Depends
 from bilianalysis.config.model import AppConfig
 from bilianalysis.scheduler.models import RunRecord
 from bilianalysis.scheduler.runner import PipelineRunner
-from app.api.deps import get_config, get_runner
-from app.api.errors import PipelineNotFound
-from app.api.schemas import (
+from api.deps import get_config, get_runner
+from api.errors import PipelineNotFound
+from api.schemas import (
     TaskTriggerResponse, PipelineInfo, PipelineListResponse, RunHistoryItem,
 )
 

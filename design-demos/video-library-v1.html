@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BiliInsight — 视频库</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+  body {
+    font-family: 'Inter', 'HarmonyOS Sans SC', 'PingFang SC', sans-serif;
+    background: #FAFAFA; color: #111827; line-height: 1.6; min-height: 100vh;
+  }
+  :root {
+    --blue: #00AEEC; --blue-light: #E6F7FD; --bg: #FAFAFA; --card: #FFFFFF;
+    --text: #111827; --text-secondary: #6B7280; --border: #E5E7EB;
+    --radius: 12px; --radius-lg: 16px;
+    --shadow: 0 2px 8px rgba(0,0,0,0.05);
+    --max-width: 1280px;
+  }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .page { max-width: var(--max-width); margin: 0 auto; padding: 0 24px; }
+
+  /* TopNav */
+  .topnav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(250,250,250,0.85); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+  }
+  .topnav-inner {
+    max-width: var(--max-width); margin: 0 auto; padding: 0 24px;
+    display: flex; align-items: center; height: 56px; gap: 32px;
+  }
+  .topnav-logo { font-size: 1.125rem; font-weight: 700; color: var(--text); text-decoration: none; letter-spacing: -0.01em; }
+  .topnav-logo span { color: var(--blue); }
+  .topnav-links { display: flex; gap: 24px; list-style: none; }
+  .topnav-links a { text-decoration: none; font-size: 0.9375rem; font-weight: 500; color: var(--text-secondary); padding: 4px 0; transition: color 0.2s; position: relative; }
+  .topnav-links a:hover, .topnav-links a.active { color: var(--text); }
+  .topnav-links a.active::after { content: ''; position: absolute; bottom: -16px; left: 0; right: 0; height: 2px; background: var(--blue); border-radius: 2px; }
+
+  /* Browse dropdown */
+  .browse-wrapper { position: relative; }
+  .browse-dropdown {
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    margin-top: 12px;
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+    border: 1px solid var(--border);
+    padding: 6px; min-width: 140px;
+    display: flex; flex-direction: column;
+    opacity: 0; visibility: hidden;
+    transition: opacity 0.15s, visibility 0.15s;
+  }
+  .browse-wrapper:hover .browse-dropdown,
+  .browse-dropdown:hover { opacity: 1; visibility: visible; }
+  .browse-dropdown a {
+    display: block; padding: 8px 14px; border-radius: 6px;
+    font-size: 0.875rem; color: var(--text-secondary); text-decoration: none;
+    transition: background 0.12s;
+  }
+  .browse-dropdown a:hover { background: var(--bg); color: var(--text); }
+
+  /* Page Header */
+  .page-header { padding: 40px 0 24px; }
+  .page-header h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px; }
+  .page-header p { font-size: 0.9375rem; color: var(--text-secondary); }
+
+  /* Sub-nav (in-page tabs for "发现" section) */
+  .sub-nav {
+    display: flex; gap: 4px; padding: 20px 0 24px;
+    border-bottom: 1px solid var(--border); margin-bottom: 24px;
+  }
+  .sub-nav a {
+    text-decoration: none; font-size: 0.875rem; font-weight: 500;
+    padding: 6px 18px; border-radius: 6px;
+    color: var(--text-secondary); transition: all 0.15s;
+  }
+  .sub-nav a:hover { background: var(--border); color: var(--text); }
+  .sub-nav a.active { background: var(--blue); color: #fff; }
+  .toolbar { display: flex; gap: 12px; align-items: center; padding-bottom: 24px; flex-wrap: wrap; }
+  .search-box {
+    flex: 1; min-width: 260px; max-width: 400px; height: 40px;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 0 16px 0 40px;
+    font-size: 0.9375rem; font-family: inherit; color: var(--text);
+    background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") 14px center no-repeat;
+    outline: none; transition: border-color 0.2s;
+  }
+  .search-box:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,174,236,0.1); }
+  .filter-tag {
+    padding: 6px 16px; border: 1px solid var(--border); border-radius: 20px;
+    font-size: 0.8125rem; font-weight: 500; color: var(--text-secondary);
+    background: var(--card); cursor: pointer; transition: all 0.2s;
+    white-space: nowrap; user-select: none;
+  }
+  .filter-tag:hover { border-color: var(--blue); color: var(--blue); }
+  .filter-tag.active { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+  /* Video Grid */
+  .video-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; padding-bottom: 32px; }
+  .video-card {
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow); overflow: hidden;
+    cursor: pointer; transition: box-shadow 0.2s, transform 0.15s;
+  }
+  .video-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-2px); }
+  .video-card-thumb {
+    width: 100%; height: 180px; background: #E5E7EB;
+    display: flex; align-items: center; justify-content: center;
+    color: #9CA3AF; font-size: 0.875rem; overflow: hidden;
+    position: relative;
+  }
+  .video-card-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .video-card-duration {
+    position: absolute; bottom: 8px; right: 8px;
+    background: rgba(0,0,0,0.75); color: #fff; font-size: 0.75rem;
+    padding: 2px 6px; border-radius: 4px; font-variant-numeric: tabular-nums;
+  }
+  .video-card-body { padding: 14px 16px; }
+  .video-card-title {
+    font-size: 0.9375rem; font-weight: 600; color: var(--text);
+    line-height: 1.4; margin-bottom: 8px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .video-card-meta { display: flex; gap: 16px; font-size: 0.8125rem; color: var(--text-secondary); }
+  .video-card-meta span { display: flex; align-items: center; gap: 4px; }
+  .video-card-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px; border-top: 1px solid var(--border);
+    font-size: 0.8125rem; color: var(--text-secondary);
+  }
+  .video-card-up { color: var(--text); font-weight: 500; }
+  .video-card-category { background: var(--blue-light); color: var(--blue); padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; }
+
+  /* Paginator */
+  /* Paginator — infinite scroll indicator */
+  .scroll-loader {
+    display: flex; align-items: center; justify-content: center;
+    padding: 32px 0 64px; gap: 8px;
+    color: var(--text-secondary); font-size: 0.875rem;
+  }
+  .scroll-spinner {
+    width: 20px; height: 20px; border: 2px solid var(--border);
+    border-top-color: var(--blue); border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 960px) { .video-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .video-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<nav class="topnav">
+  <div class="topnav-inner">
+    <a href="#" class="topnav-logo">Bili<span>Insight</span></a>
+    <ul class="topnav-links">
+      <li><a href="#" class="active">发现</a></li>
+      <li><a href="#">分析</a></li>
+      <li class="browse-wrapper">
+        <a href="#">浏览</a>
+        <div class="browse-dropdown">
+          <a href="#" class="active">视频库</a>
+          <a href="#">周报</a>
+          <a href="#">创作者</a>
+          <a href="#">分区</a>
+        </div>
+      </li>
+    </ul>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- Sub Nav -->
+  <div class="sub-nav">
+    <a href="#" class="active">视频库</a>
+    <a href="#">周报</a>
+    <a href="#">创作者</a>
+    <a href="#">分区</a>
+  </div>
+
+  <!-- Search + Filters -->
+  <div class="toolbar">
+    <input class="search-box" type="text" placeholder="搜索视频标题…" />
+    <span class="filter-tag active">全部</span>
+    <span class="filter-tag">按播放量</span>
+    <span class="filter-tag">按点赞量</span>
+    <span class="filter-tag">最新发布</span>
+  </div>
+
+  <!-- Video Grid -->
+  <div class="video-grid">
+    <!-- Card 1 -->
+    <div class="video-card">
+      <div class="video-card-thumb">
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect fill='%23E0E7FF' width='400' height='200'/%3E%3Ctext x='200' y='108' text-anchor='middle' fill='%236366F1' font-size='14' font-family='Inter'%3E视频封面%3C/text%3E%3C/svg%3E" alt="thumbnail">
+        <span class="video-card-duration">12:34</span>
+      </div>
+      <div class="video-card-body">
+        <div class="video-card-title">这集vlog我们拍了十年，致最美好的青春</div>
+        <div class="video-card-meta">
+          <span>▶ 581万</span>
+          <span>👍 24.9万</span>
+        </div>
+      </div>
+      <div class="video-card-footer">
+        <span class="video-card-up">影视飓风</span>
+        <span class="video-card-category">出行</span>
+      </div>
+    </div>
+
+    <!-- Card 2 -->
+    <div class="video-card">
+      <div class="video-card-thumb">
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect fill='%23FCE7F3' width='400' height='200'/%3E%3Ctext x='200' y='108' text-anchor='middle' fill='%23DB2777' font-size='14' font-family='Inter'%3E视频封面%3C/text%3E%3C/svg%3E" alt="thumbnail">
+        <span class="video-card-duration">08:21</span>
+      </div>
+      <div class="video-card-body">
+        <div class="video-card-title">【4K】用无人机拍到的史诗级日出云海</div>
+        <div class="video-card-meta">
+          <span>▶ 892万</span>
+          <span>👍 67.3万</span>
+        </div>
+      </div>
+      <div class="video-card-footer">
+        <span class="video-card-up">Linksphotograph</span>
+        <span class="video-card-category">摄影</span>
+      </div>
+    </div>
+
+    <!-- Card 3 -->
+    <div class="video-card">
+      <div class="video-card-thumb">
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect fill='%23DCFCE7' width='400' height='200'/%3E%3Ctext x='200' y='108' text-anchor='middle' fill='%2316A34A' font-size='14' font-family='Inter'%3E视频封面%3C/text%3E%3C/svg%3E" alt="thumbnail">
+        <span class="video-card-duration">15:02</span>
+      </div>
+      <div class="video-card-body">
+        <div class="video-card-title">【年度混剪】2024，那些值得被记住的瞬间</div>
+        <div class="video-card-meta">
+          <span>▶ 1,234万</span>
+          <span>👍 156万</span>
+        </div>
+      </div>
+      <div class="video-card-footer">
+        <span class="video-card-up">阿Test正经比比</span>
+        <span class="video-card-category">混剪</span>
+      </div>
+    </div>
+
+    <!-- Card 4 -->
+    <div class="video-card">
+      <div class="video-card-thumb">
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect fill='%23FEF3C7' width='400' height='200'/%3E%3Ctext x='200' y='108' text-anchor='middle' fill='%23D97706' font-size='14' font-family='Inter'%3E视频封面%3C/text%3E%3C/svg%3E" alt="thumbnail">
+        <span class="video-card-duration">22:10</span>
+      </div>
+      <div class="video-card-body">
+        <div class="video-card-title">我花了三年时间做了一个能吃的机械键盘</div>
+        <div class="video-card-meta">
+          <span>▶ 3,201万</span>
+          <span>👍 289万</span>
+        </div>
+      </div>
+      <div class="video-card-footer">
+        <span class="video-card-up">苏打baka</span>
+        <span class="video-card-category">科技</span>
+      </div>
+    </div>
+
+    <!-- Card 5 -->
+    <div class="video-card">
+      <div class="video-card-thumb">
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect fill='%23EDE9FE' width='400' height='200'/%3E%3Ctext x='200' y='108' text-anchor='middle' fill='%237C3AED' font-size='14' font-family='Inter'%3E视频封面%3C/text%3E%3C/svg%3E" alt="thumbnail">
+        <span class="video-card-duration">05:44</span>
+      </div>
+      <div class="video-card-body">
+        <div class="video-card-title">【定格动画】用1000张便签纸做成的马里奥</div>
+        <div class="video-card-meta">
+          <span>▶ 456万</span>
+          <span>👍 52.1万</span>
+        </div>
+      </div>
+      <div class="video-card-footer">
+        <span class="video-card-up">野生冻物</span>
+        <span class="video-card-category">动画</span>
+      </div>
+    </div>
+
+    <!-- Card 6 -->
+    <div class="video-card">
+      <div class="video-card-thumb">
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='200'%3E%3Crect fill='%23F3E8FF' width='400' height='200'/%3E%3Ctext x='200' y='108' text-anchor='middle' fill='%239338EA' font-size='14' font-family='Inter'%3E视频封面%3C/text%3E%3C/svg%3E" alt="thumbnail">
+        <span class="video-card-duration">18:33</span>
+      </div>
+      <div class="video-card-body">
+        <div class="video-card-title">【深度解析】为什么 B站 的弹幕文化独一无二</div>
+        <div class="video-card-meta">
+          <span>▶ 678万</span>
+          <span>👍 89.2万</span>
+        </div>
+      </div>
+      <div class="video-card-footer">
+        <span class="video-card-up">智能路障</span>
+        <span class="video-card-category">知识</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Infinite Scroll Loader -->
+  <div class="scroll-loader">
+    <div class="scroll-spinner"></div>
+    <span>加载更多…</span>
+  </div>
+</div>
+</body>
+</html>

@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 
 from bilianalysis.config.model import AppConfig
 from bilianalysis.scheduler.models import RunRecord
-from app.api.errors import AppError
+from api.errors import AppError
 
 logger = logging.getLogger("bilianalysis.api")
 
@@ -26,8 +26,8 @@ def create_app(config: AppConfig) -> FastAPI:
     @asynccontextmanager
     async def _lifespan(app: FastAPI):
         """Startup: create DB tables if they don't exist. Shutdown: no-op."""
-        from app.api.deps import _get_sessionmaker
-        from app.api.db.schema import Base
+        from api.deps import _get_sessionmaker
+        from api.db.schema import Base
         sm = _get_sessionmaker()
         async with sm() as session:
             async with session.bind.begin() as conn:
@@ -49,13 +49,13 @@ def create_app(config: AppConfig) -> FastAPI:
     )
 
     # Register routes
-    from app.api.router import crawler, analysis, tasks, config as config_router
+    from api.router import crawler, analysis, tasks, config as config_router
     app.include_router(crawler.router, prefix="/api")
     app.include_router(analysis.router, prefix="/api")
     app.include_router(tasks.router, prefix="/api")
     app.include_router(config_router.router, prefix="/api")
 
-    from app.api.router import db_load
+    from api.router import db_load
     app.include_router(db_load.router, prefix="/api")
 
     # Register error handlers

@@ -9,8 +9,8 @@ from bilianalysis.config.model import AppConfig
 from bilianalysis.crawler import CrawlRunner
 from bilianalysis.crawler.storage import load_progress
 from bilianalysis.scheduler.models import RunRecord
-from app.api.deps import get_config
-from app.api.schemas import TaskTriggerResponse, CrawlerStatus
+from api.deps import get_config
+from api.schemas import TaskTriggerResponse, CrawlerStatus
 
 router = APIRouter(tags=["crawler"])
 

@@ -5,8 +5,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bilianalysis.config.model import AppConfig
-from app.api.db.loader import load_incremental, load_raw_weeks
-from app.api.deps import get_config, get_db
+from api.db.loader import load_incremental, load_raw_weeks
+from api.deps import get_config, get_db
 
 router = APIRouter(tags=["database"])
 

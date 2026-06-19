@@ -12,8 +12,8 @@ from bilianalysis.engine.base import (
 )
 from bilianalysis.scheduler.models import RunRecord
 from bilianalysis.scheduler.runner import PipelineRunner
-from app.api.deps import get_config, get_runner, get_engine
-from app.api.schemas import TaskTriggerResponse, AnalysisOverview
+from api.deps import get_config, get_runner, get_engine
+from api.schemas import TaskTriggerResponse, AnalysisOverview
 
 router = APIRouter(tags=["analysis"])
 
