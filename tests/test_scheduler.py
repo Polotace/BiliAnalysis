@@ -327,6 +327,13 @@ class TestCLI:
         assert result.exit_code == 0
         assert "All 2 steps valid" in result.stdout
 
+    def test_build_warehouse_task_registered(self):
+        """build_warehouse task is registered and importable."""
+        from bilianalysis.scheduler.registry import get_task
+        task = get_task("build_warehouse")
+        assert task is not None
+        assert task.name == "build_warehouse"
+
     def test_test_command_invalid_step(self, tmp_path):
         import yaml
         config_path = tmp_path / "config.yaml"
