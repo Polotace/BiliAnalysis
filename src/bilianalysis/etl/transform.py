@@ -1,11 +1,8 @@
 """Pure data transformation: raw JSON dict → typed record dicts.
 
-This module is the sole accessor of data/raw/. It MUST NOT import
-sqlalchemy, asyncpg, or any other database driver.
+This module MUST NOT import sqlalchemy, asyncpg, or any other database driver.
 """
-import json
 from datetime import datetime, timezone
-from pathlib import Path
 
 
 def _ts_to_datetime(ts: int | float) -> datetime:
@@ -121,20 +118,3 @@ def transform_week(raw: dict) -> dict[str, list[dict]]:
         "video_stats": video_stats,
         "weekly_videos": weekly_videos,
     }
-
-
-def load_raw_weeks(raw_dir: str | Path) -> list[dict[str, list[dict]]]:
-    """Read all week_*.json files from data/raw/, apply transform_week to each.
-
-    Returns a list in week-number ascending order.
-
-    This is the ONLY function in the codebase that reads from data/raw/.
-    """
-    raw_dir = Path(raw_dir)
-    files = sorted(raw_dir.glob("week_*.json"),
-                   key=lambda p: int(p.stem.split("_")[1]))
-    results: list[dict[str, list[dict]]] = []
-    for fp in files:
-        raw = json.loads(fp.read_text(encoding="utf-8"))
-        results.append(transform_week(raw))
-    return results

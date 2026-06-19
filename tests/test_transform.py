@@ -3,7 +3,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from bilianalysis.etl.transform import transform_week, load_raw_weeks
+from bilianalysis.etl.transform import transform_week
 
 RAW_DIR = Path("data/raw")
 

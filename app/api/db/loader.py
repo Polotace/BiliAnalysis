@@ -1,13 +1,12 @@
-"""Incremental database loader for raw week records.
-
-Consumes dict records produced by src/bilianalysis/etl/transform.py.
-Does NOT read from data/ directly — only executes SQL.
-"""
+"""Database loader: read raw JSON from data/raw/, transform, write to PostgreSQL."""
+import json
 import logging
+from pathlib import Path
 
 from sqlalchemy import select, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from bilianalysis.etl import transform_week
 from app.api.db.schema import (
     WeeklyModel, CreatorModel, CategoryModel, VideoModel,
     VideoStatModel, WeeklyVideoModel,
@@ -16,6 +15,21 @@ from app.api.db.schema import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def load_raw_weeks(raw_dir: str | Path) -> list[dict[str, list[dict]]]:
+    """Read all week_*.json files from data/raw/, apply transform_week to each.
+
+    Returns a list in week-number ascending order.
+    """
+    raw_dir = Path(raw_dir)
+    files = sorted(raw_dir.glob("week_*.json"),
+                   key=lambda p: int(p.stem.split("_")[1]))
+    results: list[dict[str, list[dict]]] = []
+    for fp in files:
+        raw = json.loads(fp.read_text(encoding="utf-8"))
+        results.append(transform_week(raw))
+    return results
 
 
 async def load_week(
