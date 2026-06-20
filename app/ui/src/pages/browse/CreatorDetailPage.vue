@@ -20,6 +20,12 @@ function fmt(n: number): string {
 
 <template>
   <PageShell>
+    <div class="pt-6 pb-2">
+      <router-link to="/creators" class="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-blue transition-colors no-underline">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        返回创作者列表
+      </router-link>
+    </div>
     <div v-if="loading" class="space-y-6 py-8">
       <div class="h-48 bg-card rounded-[16px] animate-pulse" />
       <div class="h-64 bg-card rounded-[12px] animate-pulse" />
@@ -33,7 +39,7 @@ function fmt(n: number): string {
     </div>
 
     <template v-else-if="data">
-      <div class="bg-card rounded-[16px] p-10 mb-8 shadow-[var(--shadow-default)] flex items-start gap-6">
+      <div class="bg-card rounded-[16px] p-10 mb-8 shadow-(--shadow-default) flex items-start gap-6">
         <img v-if="proxyImage(data.face)" :src="proxyImage(data.face)!" :alt="data.name"
              class="w-24 h-24 rounded-full object-cover shrink-0" />
         <div v-else class="w-24 h-24 rounded-full bg-border shrink-0 flex items-center justify-center text-text-secondary text-sm">UP</div>
@@ -49,7 +55,7 @@ function fmt(n: number): string {
         </div>
       </div>
 
-      <h2 class="text-lg font-semibold text-text mb-4">作品</h2>
+      <h2 class="text-lg font-semibold text-text mb-4">作品<small class="text-gray-300">仅展示必看作品</small></h2>
       <div class="grid grid-cols-3 gap-5 pb-12">
         <VideoCard v-for="v in data.videos" :key="v.aid" :video="v" />
       </div>

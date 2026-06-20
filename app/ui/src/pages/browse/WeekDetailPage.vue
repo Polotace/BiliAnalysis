@@ -15,6 +15,12 @@ onMounted(() => send())
 
 <template>
   <PageShell>
+    <div class="pt-6 pb-2">
+      <router-link to="/weeks" class="inline-flex items-center gap-1.5 text-sm text-text-secondary hover:text-blue transition-colors no-underline">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+        返回周报列表
+      </router-link>
+    </div>
     <div v-if="loading" class="space-y-6 py-8">
       <div class="h-48 bg-card rounded-[16px] animate-pulse" />
       <div class="h-64 bg-card rounded-[12px] animate-pulse" />
