@@ -52,7 +52,7 @@ onMounted(() => loadPage())
 </script>
 
 <template>
-  <PageShell class="flex flex-col h-full">
+  <PageShell class="!py-4 h-full flex flex-col">
     <div class="shrink-0 pb-6">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">创作者</h1>
       <p class="text-[0.9375rem] text-text-secondary">
