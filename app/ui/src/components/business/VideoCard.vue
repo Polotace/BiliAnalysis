@@ -18,8 +18,8 @@ function openBili() {
 <template>
   <router-link
     :to="`/videos/${video.aid}`"
-    class="group block bg-card rounded-[12px] shadow-[var(--shadow-default)] overflow-hidden
-           transition-shadow duration-200 hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5
+    class="group block bg-card rounded-[12px] shadow-(--shadow-default) overflow-hidden
+           transition-shadow duration-200 hover:shadow-(--shadow-hover) hover:-translate-y-0.5
            cursor-pointer no-underline"
   >
     <div class="relative h-45 bg-border overflow-hidden">
@@ -36,7 +36,7 @@ function openBili() {
       <!-- B站跳转按钮 -->
       <span
         v-if="video.bvid"
-        @click.stop="openBili"
+        @click.prevent.stop="openBili"
         class="absolute top-2 right-2 bg-white/90 hover:bg-white text-blue text-xs
                w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
                opacity-0 group-hover:opacity-100 transition-opacity duration-150
