@@ -26,7 +26,7 @@ const option = computed<EChartsOption>(() => ({
     bottom: 0,
     data: ['平均播放', '平均点赞', '互动率'],
   },
-  grid: { left: 60, right: 80, top: 16, bottom: 48 },
+  grid: { left: 60, right: 100, top: 16, bottom: 48 },
   dataZoom: [
     {
       type: 'slider',
@@ -49,19 +49,24 @@ const option = computed<EChartsOption>(() => ({
   yAxis: [
     {
       type: 'value',
-      name: '播放量',
+      name: '播放/点赞',
+      nameGap: 40,
       axisLabel: {
-        color: '#00AEEC', fontSize: 11,
+        color: '#6B7280', fontSize: 10,
         formatter: (v: number) => v >= 10000 ? `${(v / 10000).toFixed(0)}万` : String(v),
       },
     },
     {
       type: 'value',
       name: '互动率',
+      position: 'right',
+      offset: 10,
+      nameGap: 40,
       axisLabel: {
-        color: '#F59E0B', fontSize: 11,
-        formatter: (v: number) => `${(v * 100).toFixed(1)}%`,
+        color: '#F59E0B', fontSize: 10,
+        formatter: (v: number) => `${(v * 100).toFixed(0)}%`,
       },
+      splitLine: { show: false },
     },
   ],
   series: [
