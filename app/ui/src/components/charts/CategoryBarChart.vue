@@ -23,14 +23,6 @@ const option = computed<EChartsOption>(() => {
   })
   const values = top.map(c => c.video_count)
 
-  // Append "其他" if there are remaining categories
-  if (rest.length > 0) {
-    names.push(`其他 ${rest.length} 个分区`)
-    values.push(restCount)
-  }
-
-  const chartHeight = names.length * BAR_HEIGHT + 40
-
   return {
     animation: true,
     animationDuration: 300,
@@ -38,8 +30,7 @@ const option = computed<EChartsOption>(() => {
       trigger: 'axis',
       formatter: (params: any) => {
         const d = Array.isArray(params) ? params[0] : params
-        const idx = d.dataIndex
-        const realName = idx < MAX_SHOW ? top[idx].tname : `其他 ${rest.length} 个分区`
+        const realName = top[d.dataIndex]?.tname ?? ''
         return `${realName}<br/>视频数: ${d.value}`
       },
     },
@@ -58,13 +49,7 @@ const option = computed<EChartsOption>(() => {
     series: [{
       type: 'bar',
       data: values,
-      itemStyle: {
-        color: (params: any) => {
-          if (params.dataIndex >= MAX_SHOW) return '#9CA3AF'
-          return '#00AEEC'
-        },
-        borderRadius: [0, 4, 4, 0],
-      },
+      itemStyle: { color: '#00AEEC', borderRadius: [0, 4, 4, 0] },
       label: {
         show: true,
         position: 'right',
@@ -79,8 +64,7 @@ const option = computed<EChartsOption>(() => {
 
 const chartHeight = computed(() => {
   const n = Math.min(props.categories.length, MAX_SHOW)
-  const hasRest = props.categories.length > MAX_SHOW
-  return (hasRest ? n + 1 : n) * BAR_HEIGHT + 40
+  return n * BAR_HEIGHT + 40
 })
 
 useChart(chartRef, option)
