@@ -42,7 +42,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
   <div ref="root" class="filter-dropdown relative">
     <button
       @click="toggle"
-      class="flex items-center gap-1.5 px-3 py-1.5 border rounded-[20px] text-xs font-medium
+      class="flex items-center gap-1.5 px-4 py-1.5 border rounded-[20px] text-[0.8125rem] font-medium
              transition-colors duration-150 cursor-pointer"
       :class="modelValue !== null
         ? 'bg-blue text-white border-blue'
@@ -69,7 +69,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
       <button
         v-if="modelValue !== null"
         @click="clear"
-        class="w-full text-left px-3 py-2 rounded-lg text-xs font-medium text-text-secondary
+        class="w-full text-left px-3 py-2 rounded-lg text-[0.8125rem] font-medium text-text-secondary
                hover:bg-border/40 transition-colors cursor-pointer bg-transparent border-0 mb-1"
       >
         ✕ 清除筛选
@@ -78,7 +78,7 @@ onUnmounted(() => document.removeEventListener('click', onDocClick))
         v-for="opt in options"
         :key="opt.key"
         @click="select(opt.key)"
-        class="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg text-xs
+        class="w-full text-left flex items-center justify-between px-3 py-2 rounded-lg text-[0.8125rem]
                transition-colors cursor-pointer bg-transparent border-0"
         :class="modelValue === opt.key
           ? 'bg-blue-light/60 text-blue font-semibold'
