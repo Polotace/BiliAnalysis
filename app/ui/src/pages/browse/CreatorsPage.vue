@@ -4,6 +4,7 @@ import { fetchCreators } from '@/composables/useApi'
 import { useRequest } from 'alova/client'
 import { ElScrollbar } from 'element-plus'
 import PageShell from '@/components/layout/PageShell.vue'
+import BrowseSidebar from '@/components/layout/BrowseSidebar.vue'
 import SortTabs from '@/components/business/SortTabs.vue'
 import CreatorCard from '@/components/business/CreatorCard.vue'
 import type { CreatorSummary } from '@/types/api'
@@ -52,7 +53,9 @@ onMounted(() => loadPage())
 </script>
 
 <template>
-  <PageShell class="!py-4 h-full flex flex-col">
+  <div class="flex h-full">
+    <BrowseSidebar />
+    <PageShell class="!py-4 h-full flex flex-col flex-1 min-w-0">
     <div class="shrink-0 pb-6">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">创作者</h1>
       <p class="text-[0.9375rem] text-text-secondary">
@@ -87,4 +90,5 @@ onMounted(() => loadPage())
       </el-scrollbar>
     </template>
   </PageShell>
+  </div>
 </template>

@@ -48,7 +48,7 @@ function isBrowseActive() {
             />
           </router-link>
         </li>
-        <li class="relative group">
+        <li class="relative group lg:hidden">
           <router-link
             to="/videos"
             class="no-underline text-[0.9375rem] font-medium text-text-secondary px-0 py-1
@@ -72,6 +72,21 @@ function isBrowseActive() {
             <router-link to="/creators" class="block px-3.5 py-2 rounded-md text-sm text-text-secondary no-underline transition-colors duration-100 hover:bg-bg hover:text-text">创作者</router-link>
             <router-link to="/categories" class="block px-3.5 py-2 rounded-md text-sm text-text-secondary no-underline transition-colors duration-100 hover:bg-bg hover:text-text">分区</router-link>
           </div>
+        </li>
+        <li class="hidden lg:block">
+          <router-link
+            to="/videos"
+            class="no-underline text-[0.9375rem] font-medium text-text-secondary px-0 py-1
+                   transition-colors duration-200 relative
+                   hover:text-text"
+            :class="{ 'text-text!': isBrowseActive() }"
+          >
+            浏览
+            <span
+              v-if="isBrowseActive()"
+              class="absolute -bottom-4 left-0 right-0 h-0.5 bg-blue rounded-sm"
+            />
+          </router-link>
         </li>
       </ul>
       <router-link
