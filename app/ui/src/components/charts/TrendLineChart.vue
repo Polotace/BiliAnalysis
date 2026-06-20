@@ -8,6 +8,13 @@ const props = defineProps<{ weeks: WeeklyTrend[] }>()
 
 const chartRef: Ref<HTMLElement | null> = ref(null)
 
+const X_LABEL_INTERVAL = computed(() => {
+  const n = props.weeks.length
+  if (n <= 20) return 0  // show all
+  if (n <= 50) return Math.floor(n / 10)
+  return Math.floor(n / 15)  // ~15 labels max
+})
+
 const option = computed<EChartsOption>(() => ({
   animation: true,
   animationDuration: 300,
@@ -19,17 +26,42 @@ const option = computed<EChartsOption>(() => ({
     bottom: 0,
     data: ['平均播放', '平均点赞', '互动率'],
   },
-  grid: { left: 48, right: 16, top: 16, bottom: 40 },
+  grid: { left: 60, right: 60, top: 16, bottom: 48 },
+  dataZoom: [
+    {
+      type: 'slider',
+      bottom: 8,
+      height: 20,
+      borderColor: '#E5E7EB',
+      fillerColor: 'rgba(0,174,236,0.1)',
+      handleStyle: { color: '#00AEEC' },
+      textStyle: { color: '#6B7280', fontSize: 10 },
+    },
+  ],
   xAxis: {
     type: 'category',
     data: props.weeks.map(w => `第${w.week_number}期`),
-    axisLabel: { color: '#6B7280', fontSize: 11 },
+    axisLabel: {
+      color: '#6B7280', fontSize: 11,
+      interval: X_LABEL_INTERVAL.value,
+    },
   },
   yAxis: [
     {
       type: 'value',
-      name: '播放/点赞',
-      axisLabel: { color: '#6B7280', fontSize: 11 },
+      name: '播放量',
+      axisLabel: {
+        color: '#6B7280', fontSize: 11,
+        formatter: (v: number) => v >= 10000 ? `${(v / 10000).toFixed(0)}万` : String(v),
+      },
+    },
+    {
+      type: 'value',
+      name: '点赞量',
+      axisLabel: {
+        color: '#6B7280', fontSize: 11,
+        formatter: (v: number) => v >= 10000 ? `${(v / 10000).toFixed(0)}万` : String(v),
+      },
     },
     {
       type: 'value',
@@ -43,19 +75,24 @@ const option = computed<EChartsOption>(() => ({
   series: [
     {
       name: '平均播放', type: 'line', smooth: false,
+      yAxisIndex: 0,
       data: props.weeks.map(w => w.avg_view),
       itemStyle: { color: '#00AEEC' },
+      symbol: 'none',
     },
     {
       name: '平均点赞', type: 'line', smooth: false,
+      yAxisIndex: 1,
       data: props.weeks.map(w => w.avg_like),
       itemStyle: { color: '#22C55E' },
+      symbol: 'none',
     },
     {
       name: '互动率', type: 'line', smooth: false,
-      yAxisIndex: 1,
+      yAxisIndex: 2,
       data: props.weeks.map(w => w.avg_interaction_rate),
       itemStyle: { color: '#F59E0B' },
+      symbol: 'none',
     },
   ],
 }))
