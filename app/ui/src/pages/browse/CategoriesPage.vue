@@ -16,7 +16,7 @@ const COLORS = [
 </script>
 
 <template>
-  <div class="flex h-full">
+  
     <Sidebar />
     <PageShell class="flex-1 min-w-0">
     <div class="pb-10">

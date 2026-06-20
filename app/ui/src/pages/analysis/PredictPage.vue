@@ -19,7 +19,7 @@ function fmtR2(v: number): string {
 </script>
 
 <template>
-  <div class="flex h-full">
+  
     <Sidebar />
     <PageShell class="flex-1 min-w-0">
     <SubNavTabs class="lg:hidden" />

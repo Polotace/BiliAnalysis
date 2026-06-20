@@ -38,7 +38,8 @@ function isActive(link: NavLink) {
 </script>
 
 <template>
-  <aside class="hidden lg:flex lg:flex-col w-44 shrink-0 pt-10 min-h-0">
+  <aside class="hidden lg:flex lg:flex-col fixed left-0 top-14 bottom-0 w-44 pt-6 z-30
+                bg-bg/95 backdrop-blur-sm">
     <p class="px-3 pb-4 text-[0.6875rem] font-semibold text-text-secondary/60 uppercase tracking-widest">
       {{ sectionLabel }}
     </p>
