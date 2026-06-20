@@ -17,6 +17,7 @@ const ANALYSIS_LINKS: NavLink[] = [
   { to: '/analysis/stats', label: '统计概览', icon: 'chart' },
   { to: '/analysis/clusters', label: '聚类分析', icon: 'scatter' },
   { to: '/analysis/predictions', label: '预测分析', icon: 'trend' },
+  { to: '/analysis/keywords', label: '内容洞察', icon: 'cloud' },
 ]
 
 const links = computed<NavLink[]>(() => {
@@ -88,6 +89,10 @@ function isActive(link: NavLink) {
         <!-- Trend/line -->
         <svg v-else-if="link.icon === 'trend'" class="w-4 h-4 shrink-0" :class="isActive(link) ? 'text-blue' : 'text-text-secondary/50'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h2.25M3.75 3l-1.5 15M3.75 3h16.5M3.75 3l16.5 18M21 3v11.25A2.25 2.25 0 0 1 18.75 16.5h-2.25M21 3l1.5 15M21 3 4.5 21"/>
+        </svg>
+        <!-- Cloud -->
+        <svg v-else-if="link.icon === 'cloud'" class="w-4 h-4 shrink-0" :class="isActive(link) ? 'text-blue' : 'text-text-secondary/50'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z"/>
         </svg>
         <span>{{ link.label }}</span>
       </router-link>

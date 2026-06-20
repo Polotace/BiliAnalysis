@@ -206,6 +206,33 @@ export interface CategorySummary {
   video_count: number
 }
 
+// ── Keywords ──
+
+export interface KeywordItem {
+  word: string
+  weight: number
+}
+
+export interface WeeklyKeywords {
+  week_number: number
+  keywords: KeywordItem[]
+}
+
+export interface CategoryKeywords {
+  tname: string
+  keywords: KeywordItem[]
+}
+
+export interface GlobalKeywords {
+  keywords: KeywordItem[]
+}
+
+export interface KeywordsReport {
+  global_: GlobalKeywords
+  by_week: WeeklyKeywords[]
+  by_category: CategoryKeywords[]
+}
+
 // ── Admin ──
 
 export interface CrawlerStatus {

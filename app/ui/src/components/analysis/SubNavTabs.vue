@@ -6,12 +6,14 @@ const TABS = [
   { key: 'stats', label: '统计概览', path: '/analysis/stats' },
   { key: 'clusters', label: '聚类分析', path: '/analysis/clusters' },
   { key: 'predict', label: '预测分析', path: '/analysis/predictions' },
+  { key: 'keywords', label: '内容洞察', path: '/analysis/keywords' },
 ] as const
 
 const router = useRouter()
 const route = useRoute()
 
 const activeKey = computed(() => {
+  if (route.path.includes('keywords')) return 'keywords'
   if (route.path.includes('clusters')) return 'clusters'
   if (route.path.includes('predict')) return 'predict'
   return 'stats'

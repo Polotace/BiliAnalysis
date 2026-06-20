@@ -7,6 +7,7 @@ from typing import Annotated
 from fastapi import APIRouter, Request, Depends, HTTPException
 
 from bilianalysis.config.model import AppConfig
+from bilianalysis.nlp import KeywordsReport as NLPKeywordsReport
 from bilianalysis.engine.base import (
     AnalysisEngine, StatReport, ClusterReport, PredictionReport,
 )
@@ -142,3 +143,16 @@ async def get_predictions(
             status_code=503,
             detail="暂无数据，请先触发一次数据采集与分析",
         )
+
+
+@router.get("/analysis/keywords")
+async def get_keywords(config: Annotated[AppConfig, Depends(get_config)]):
+    """Get keyword analysis report from cache, or 503 if not generated."""
+    cached = _read_json(_reports_dir(config) / "keywords_report.json")
+    if cached:
+        return cached
+    _check_data_ready(config)
+    raise HTTPException(
+        status_code=503,
+        detail="关键词报告尚未生成，请先触发 analysis 流水线",
+    )

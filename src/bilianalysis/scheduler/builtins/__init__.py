@@ -5,3 +5,4 @@ from .stats_task import StatisticsTask    # noqa: F401
 from .cluster_task import ClusteringTask  # noqa: F401
 from .predict_task import PredictionTask  # noqa: F401
 from .warehouse_task import WarehouseTask  # noqa: F401
+from .keywords_task import KeywordsTask  # noqa: F401

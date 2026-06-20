@@ -10,6 +10,7 @@ import type {
   CategorySummary,
   CrawlerStatus, TaskTriggerResponse, PipelineListResponse,
   RunHistoryItem, AnalysisOverview, AppConfigData,
+  KeywordsReport,
 } from '@/types/api'
 
 const alova = createAlova({
@@ -122,6 +123,16 @@ export function useCreatorDetail(mid: number) {
 
 export function useCategoriesList() {
   return useRequest(fetchCategories, { immediate: false })
+}
+
+// ── Keywords ──
+
+export function fetchKeywords() {
+  return alova.Get<KeywordsReport>('/analysis/keywords')
+}
+
+export function useKeywords() {
+  return useRequest(fetchKeywords, { immediate: false })
 }
 
 // ── Admin ──
