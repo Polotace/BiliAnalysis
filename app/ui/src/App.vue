@@ -6,9 +6,9 @@ const cachedViews = ['VideoLibraryPage', 'WeeksPage', 'CreatorsPage', 'HomePage'
 </script>
 
 <template>
-  <div class="h-screen flex flex-col overflow-hidden">
+  <div class="h-screen flex flex-col">
     <TopNav />
-    <div class="flex-1 overflow-hidden">
+    <div class="flex-1 min-h-0">
       <router-view v-slot="{ Component }">
         <keep-alive :max="5" :include="cachedViews">
           <component :is="Component" />
