@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useCreatorsList } from '@/composables/useApi'
+import { fetchCreators } from '@/composables/useApi'
+import { useRequest } from 'alova/client'
 import { ElScrollbar } from 'element-plus'
 import PageShell from '@/components/layout/PageShell.vue'
 import SortTabs from '@/components/business/SortTabs.vue'
@@ -20,11 +21,10 @@ const total = ref(0)
 const PAGE_SIZE = 24
 const isLoadingMore = ref(false)
 
-const { loading, send } = useCreatorsList({
-  page: currentPage.value,
-  page_size: PAGE_SIZE,
-  sort_by: sortBy.value,
-})
+const { loading, send } = useRequest(
+  () => fetchCreators({ page: currentPage.value, page_size: PAGE_SIZE, sort_by: sortBy.value }),
+  { immediate: false },
+)
 
 const hasMore = computed(() => creators.value.length < total.value)
 
@@ -53,7 +53,7 @@ onMounted(() => loadPage())
 
 <template>
   <PageShell>
-    <div class="py-10">
+    <div class="pb-10">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">创作者</h1>
       <p class="text-[0.9375rem] text-text-secondary">
         <span class="tabular font-semibold text-text">{{ total }}</span> 位创作者上榜「每周必看」
@@ -65,7 +65,7 @@ onMounted(() => loadPage())
     </div>
 
     <div v-if="loading && creators.length === 0" class="grid grid-cols-3 gap-4 pb-8">
-      <div v-for="i in 6" :key="i" class="h-[80px] bg-card rounded-[12px] animate-pulse" />
+      <div v-for="i in 6" :key="i" class="h-20 bg-card rounded-[12px] animate-pulse" />
     </div>
 
     <div v-else-if="!loading && creators.length === 0 && !hasMore" class="py-24 text-center">
