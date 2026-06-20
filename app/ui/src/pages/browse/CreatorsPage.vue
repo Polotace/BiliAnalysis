@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useCreatorsList } from '@/composables/useApi'
-import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
+import { ElScrollbar } from 'element-plus'
 import PageShell from '@/components/layout/PageShell.vue'
 import SortTabs from '@/components/business/SortTabs.vue'
 import CreatorCard from '@/components/business/CreatorCard.vue'
-import InfiniteScroll from '@/components/business/InfiniteScroll.vue'
 import type { CreatorSummary } from '@/types/api'
 
 const sortBy = ref('video_count')
@@ -19,6 +18,7 @@ const creators = ref<CreatorSummary[]>([])
 const currentPage = ref(1)
 const total = ref(0)
 const PAGE_SIZE = 24
+const isLoadingMore = ref(false)
 
 const { loading, send } = useCreatorsList({
   page: currentPage.value,
@@ -40,11 +40,13 @@ async function loadPage() {
 async function resetAndLoad() {
   currentPage.value = 1; creators.value = []; await loadPage()
 }
-async function loadMore() { currentPage.value++; await loadPage() }
-async function safeLoadMore() {
-  if (hasMore.value && !loading.value) await loadMore()
+async function loadMore() {
+  if (isLoadingMore.value || !hasMore.value) return
+  isLoadingMore.value = true
+  currentPage.value++
+  await loadPage()
+  isLoadingMore.value = false
 }
-const { sentinelRef } = useInfiniteScroll(safeLoadMore, hasMore, loading)
 
 onMounted(() => loadPage())
 </script>
@@ -71,12 +73,18 @@ onMounted(() => loadPage())
     </div>
 
     <template v-else>
-      <div class="grid grid-cols-3 gap-4 pb-8">
-        <CreatorCard v-for="c in creators" :key="c.mid" :creator="c" />
-      </div>
-      <div ref="sentinelRef">
-        <InfiniteScroll :loading="loading" :has-more="hasMore" />
-      </div>
+      <el-scrollbar height="calc(100vh - 230px)" @end-reached="loadMore">
+        <div class="grid grid-cols-3 gap-4 pb-8">
+          <CreatorCard v-for="c in creators" :key="c.mid" :creator="c" />
+        </div>
+        <div class="flex items-center justify-center py-6 gap-2 text-sm text-text-secondary">
+          <template v-if="isLoadingMore">
+            <div class="w-5 h-5 border-2 border-border border-t-blue rounded-full animate-spin" />
+            <span>加载更多…</span>
+          </template>
+          <span v-else-if="!hasMore">— 没有更多了 —</span>
+        </div>
+      </el-scrollbar>
     </template>
   </PageShell>
 </template>

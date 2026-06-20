@@ -1,16 +1,16 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useWeeksList } from '@/composables/useApi'
+import { ElScrollbar } from 'element-plus'
 import PageShell from '@/components/layout/PageShell.vue'
 import WeekCard from '@/components/business/WeekCard.vue'
-import InfiniteScroll from '@/components/business/InfiniteScroll.vue'
-import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
 import type { WeekItem } from '@/types/api'
 
 const { data, loading, error, send } = useWeeksList()
 const weeks = ref<WeekItem[]>([])
 const PAGE_SIZE = 20
 const displayCount = ref(PAGE_SIZE)
+const isLoadingMore = ref(false)
 
 onMounted(async () => {
   const result = await send()
@@ -21,13 +21,12 @@ const displayed = computed(() => weeks.value.slice(0, displayCount.value))
 const hasMore = computed(() => displayCount.value < weeks.value.length)
 
 async function loadMore() {
+  if (isLoadingMore.value || !hasMore.value) return
+  isLoadingMore.value = true
   displayCount.value = Math.min(displayCount.value + PAGE_SIZE, weeks.value.length)
-  await new Promise(r => setTimeout(r, 100))
+  await new Promise(r => setTimeout(r, 200))
+  isLoadingMore.value = false
 }
-async function safeLoadMore() {
-  if (hasMore.value && !loading.value) await loadMore()
-}
-const { sentinelRef } = useInfiniteScroll(safeLoadMore, hasMore, loading)
 </script>
 
 <template>
@@ -54,12 +53,18 @@ const { sentinelRef } = useInfiniteScroll(safeLoadMore, hasMore, loading)
     </div>
 
     <template v-else>
-      <div class="grid grid-cols-2 gap-6 pb-8">
-        <WeekCard v-for="w in displayed" :key="w.number" :week="w" />
-      </div>
-      <div ref="sentinelRef">
-        <InfiniteScroll :loading="false" :has-more="hasMore" />
-      </div>
+      <el-scrollbar height="calc(100vh - 200px)" @end-reached="loadMore">
+        <div class="grid grid-cols-2 gap-6 pb-8">
+          <WeekCard v-for="w in displayed" :key="w.number" :week="w" />
+        </div>
+        <div class="flex items-center justify-center py-6 gap-2 text-sm text-text-secondary">
+          <template v-if="isLoadingMore">
+            <div class="w-5 h-5 border-2 border-border border-t-blue rounded-full animate-spin" />
+            <span>加载更多…</span>
+          </template>
+          <span v-else-if="!hasMore">— 没有更多了 —</span>
+        </div>
+      </el-scrollbar>
     </template>
   </PageShell>
 </template>

@@ -2,12 +2,11 @@
 import { ref, computed, onMounted } from 'vue'
 import { fetchVideos } from '@/composables/useApi'
 import { useRequest } from 'alova/client'
-import { useInfiniteScroll } from '@/composables/useInfiniteScroll'
+import { ElScrollbar } from 'element-plus'
 import PageShell from '@/components/layout/PageShell.vue'
 import SearchBar from '@/components/business/SearchBar.vue'
 import SortTabs from '@/components/business/SortTabs.vue'
 import VideoCard from '@/components/business/VideoCard.vue'
-import InfiniteScroll from '@/components/business/InfiniteScroll.vue'
 import type { VideoSummary } from '@/types/api'
 
 const search = ref('')
@@ -22,6 +21,7 @@ const videos = ref<VideoSummary[]>([])
 const currentPage = ref(1)
 const total = ref(0)
 const PAGE_SIZE = 20
+const isLoadingMore = ref(false)
 
 const { loading, send } = useRequest(
   () => fetchVideos({
@@ -54,14 +54,12 @@ async function resetAndLoad() {
 }
 
 async function loadMore() {
+  if (isLoadingMore.value || !hasMore.value) return
+  isLoadingMore.value = true
   currentPage.value++
   await loadPage()
+  isLoadingMore.value = false
 }
-
-async function safeLoadMore() {
-  if (hasMore.value && !loading.value) await loadMore()
-}
-const { sentinelRef } = useInfiniteScroll(safeLoadMore, hasMore, loading)
 
 onMounted(() => loadPage())
 </script>
@@ -89,12 +87,18 @@ onMounted(() => loadPage())
     </div>
 
     <template v-else>
-      <div class="grid grid-cols-3 gap-5 pb-8">
-        <VideoCard v-for="v in videos" :key="v.aid" :video="v" />
-      </div>
-      <div ref="sentinelRef">
-        <InfiniteScroll :loading="loading" :has-more="hasMore" />
-      </div>
+      <el-scrollbar height="calc(100vh - 200px)" @end-reached="loadMore">
+        <div class="grid grid-cols-3 gap-5 pb-8">
+          <VideoCard v-for="v in videos" :key="v.aid" :video="v" />
+        </div>
+        <div class="flex items-center justify-center py-6 gap-2 text-sm text-text-secondary">
+          <template v-if="isLoadingMore">
+            <div class="w-5 h-5 border-2 border-border border-t-blue rounded-full animate-spin" />
+            <span>加载更多…</span>
+          </template>
+          <span v-else-if="!hasMore">— 没有更多了 —</span>
+        </div>
+      </el-scrollbar>
     </template>
   </PageShell>
 </template>
