@@ -76,6 +76,12 @@ export function fetchCategories() {
   return alova.Get<CategorySummary[]>('/categories')
 }
 
+// ── Live creator stats ──
+
+export function fetchCreatorStats(mid: number) {
+  return alova.Get<{ mid: number; following: number; follower: number }>(`/creators/${mid}/stats`)
+}
+
 // ── Composables (per-page usage) ──
 
 export function useStats() {

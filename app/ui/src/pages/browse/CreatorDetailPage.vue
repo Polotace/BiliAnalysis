@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { useCreatorDetail } from '@/composables/useApi'
+import { useCreatorDetail, fetchCreatorStats } from '@/composables/useApi'
 import { proxyImage } from '@/composables/useImageProxy'
 import PageShell from '@/components/layout/PageShell.vue'
 import VideoCard from '@/components/business/VideoCard.vue'
@@ -11,7 +11,15 @@ const router = useRouter()
 const mid = Number(route.params.mid)
 const { data, loading, error, send } = useCreatorDetail(mid)
 
-onMounted(() => send())
+const liveStats = ref<{ follower: number; following: number } | null>(null)
+
+onMounted(async () => {
+  send()
+  try {
+    const stats = await fetchCreatorStats(mid)
+    liveStats.value = stats as any
+  } catch { /* live stats are optional */ }
+})
 
 function fmt(n: number): string {
   return n >= 10000 ? `${(n / 10000).toFixed(1)}万` : String(n)
@@ -45,8 +53,9 @@ function fmt(n: number): string {
         <div v-else class="w-24 h-24 rounded-full bg-border shrink-0 flex items-center justify-center text-text-secondary text-sm">UP</div>
         <div class="flex-1">
           <h1 class="text-[1.75rem] font-bold text-text mb-3">{{ data.name }}</h1>
-          <div class="grid grid-cols-5 gap-4 tabular">
+          <div class="flex gap-6 tabular flex-wrap">
             <div><p class="text-2xl font-bold text-text">{{ data.video_count }}</p><p class="text-xs text-text-secondary">视频</p></div>
+            <div v-if="liveStats"><p class="text-2xl font-bold text-text">{{ fmt(liveStats.follower) }}</p><p class="text-xs text-text-secondary">粉丝</p></div>
             <div><p class="text-2xl font-bold text-text">{{ fmt(data.total_views) }}</p><p class="text-xs text-text-secondary">总播放</p></div>
             <div><p class="text-2xl font-bold text-text">{{ fmt(data.total_likes) }}</p><p class="text-xs text-text-secondary">总点赞</p></div>
             <div><p class="text-2xl font-bold text-text">{{ fmt(data.total_coins) }}</p><p class="text-xs text-text-secondary">总投币</p></div>

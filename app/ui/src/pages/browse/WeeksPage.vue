@@ -72,5 +72,4 @@ async function loadMore() {
       </el-scrollbar>
     </template>
   </PageShell>
-  </div>
 </template>

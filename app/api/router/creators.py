@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.db.queries import get_creators, get_creator
 from api.deps import get_db
+from bilianalysis.utils.fetch import create_session
+from bilianalysis.crawler.api import get_creator_relation_stats
 
 router = APIRouter(tags=["creators"])
 
@@ -36,3 +38,14 @@ async def show_creator(
     if detail is None:
         raise HTTPException(404, f"Creator {mid} not found")
     return detail
+
+
+@router.get("/creators/{mid}/stats")
+async def creator_live_stats(mid: int):
+    """Fetch live follower/following count from Bilibili API."""
+    session = create_session()
+    try:
+        data = await get_creator_relation_stats(session, mid)
+        return data
+    finally:
+        await session.close()

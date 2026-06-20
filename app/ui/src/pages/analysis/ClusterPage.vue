@@ -16,7 +16,6 @@ onMounted(() => send())
 </script>
 
 <template>
-  
     <Sidebar />
     <PageShell class="flex-1 min-w-0">
     <SubNavTabs class="lg:hidden" />
@@ -67,5 +66,4 @@ onMounted(() => send())
       <p class="text-text-secondary">暂无数据，请先触发一次数据采集与分析</p>
     </div>
   </PageShell>
-  </div>
 </template>

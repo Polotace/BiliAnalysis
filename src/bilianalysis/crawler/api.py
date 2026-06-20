@@ -1,4 +1,4 @@
-"""Bilibili "每周必看" API 封装。"""
+"""Bilibili API 封装。"""
 from typing import Any
 from urllib.parse import urlencode
 
@@ -7,6 +7,7 @@ from bilianalysis.utils.fetch import get, BiliCodeError
 from bilianalysis.crawler.signer import WbiSigner
 
 BASE_URL = "https://api.bilibili.com/x/web-interface/popular/series"
+RELATION_URL = "https://api.bilibili.com/x/relation/stat"
 
 
 def _check_bili_code(resp: dict, url: str) -> None:
@@ -40,6 +41,20 @@ async def get_weekly_videos(
        HttpError 直接透传，由 pipeline 层捕获处理。"""
     params = signer.sign({"number": str(number)})
     url = f"{BASE_URL}/one?{urlencode(params)}"
+    resp = await get(session, url)
+    _check_bili_code(resp, url)
+    return resp.get("data", {})
+
+
+async def get_creator_relation_stats(
+    session: aiohttp.ClientSession,
+    mid: int,
+) -> dict[str, Any]:
+    """获取 UP 主关注/粉丝数。无需 WBI 签名，风控要求低。
+
+    返回 data 字段包含: mid, following, follower
+    """
+    url = f"{RELATION_URL}?vmid={mid}&web_location=333.1387"
     resp = await get(session, url)
     _check_bili_code(resp, url)
     return resp.get("data", {})
