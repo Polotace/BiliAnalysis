@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { fetchVideos } from '@/composables/useApi'
+import { fetchVideos, fetchCategories } from '@/composables/useApi'
 import { useRequest } from 'alova/client'
 import { ElScrollbar } from 'element-plus'
 import PageShell from '@/components/layout/PageShell.vue'
@@ -8,10 +8,12 @@ import Sidebar from '@/components/layout/Sidebar.vue'
 import SearchBar from '@/components/business/SearchBar.vue'
 import SortTabs from '@/components/business/SortTabs.vue'
 import VideoCard from '@/components/business/VideoCard.vue'
-import type { VideoSummary } from '@/types/api'
+import type { VideoSummary, CategorySummary } from '@/types/api'
 
 const search = ref('')
 const sortBy = ref('view')
+const categoryTid = ref<number | null>(null)
+const categories = ref<CategorySummary[]>([])
 const SORT_OPTIONS = [
   { key: 'view', label: '按播放量' },
   { key: 'like', label: '按点赞量' },
@@ -30,8 +32,13 @@ const { loading, send } = useRequest(
     page_size: PAGE_SIZE,
     search: search.value || undefined,
     sort_by: sortBy.value,
+    category_tid: categoryTid.value ?? undefined,
   }),
   { immediate: false },
+)
+
+const { data: categoriesData, send: loadCategories } = useRequest(
+  fetchCategories, { immediate: false },
 )
 
 const hasMore = computed(() => videos.value.length < total.value)
@@ -62,7 +69,16 @@ async function loadMore() {
   isLoadingMore.value = false
 }
 
-onMounted(() => loadPage())
+function selectCategory(tid: number | null) {
+  categoryTid.value = categoryTid.value === tid ? null : tid
+  resetAndLoad()
+}
+
+onMounted(async () => {
+  const cats = await loadCategories()
+  if (cats) categories.value = cats as any
+  await loadPage()
+})
 </script>
 
 <template>
@@ -76,9 +92,22 @@ onMounted(() => loadPage())
       </p>
     </div>
 
-    <div class="shrink-0 flex items-center gap-3 pb-4 flex-wrap">
+    <div class="shrink-0 flex items-center gap-3 pb-3 flex-wrap">
       <SearchBar v-model="search" placeholder="搜索视频标题…" @update:model-value="resetAndLoad" />
       <SortTabs v-model="sortBy" :options="SORT_OPTIONS" @update:model-value="resetAndLoad" />
+    </div>
+    <div class="shrink-0 flex gap-2 pb-4 flex-wrap">
+      <button
+        v-for="cat in categories"
+        :key="cat.tid"
+        @click="selectCategory(cat.tid)"
+        class="px-3 py-1 border rounded-[20px] text-xs font-medium transition-colors cursor-pointer"
+        :class="categoryTid === cat.tid
+          ? 'bg-blue text-white border-blue'
+          : 'bg-card text-text-secondary border-border hover:border-blue hover:text-blue'"
+      >
+        {{ cat.tname || cat.tid }} {{ cat.video_count }}
+      </button>
     </div>
 
     <div v-if="loading && videos.length === 0" class="grid grid-cols-3 gap-5 pb-8">
@@ -104,5 +133,4 @@ onMounted(() => loadPage())
       </el-scrollbar>
     </template>
   </PageShell>
-  </div>
 </template>
