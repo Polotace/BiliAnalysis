@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { useStats } from '@/composables/useApi'
 import PageShell from '@/components/layout/PageShell.vue'
+import BrowseSidebar from '@/components/layout/BrowseSidebar.vue'
 import SubNavTabs from '@/components/analysis/SubNavTabs.vue'
 import StatCard from '@/components/shared/StatCard.vue'
 import SectionHeader from '@/components/shared/SectionHeader.vue'
@@ -15,8 +16,10 @@ onMounted(() => send())
 </script>
 
 <template>
-  <PageShell>
-    <SubNavTabs />
+  <div class="flex h-full">
+    <BrowseSidebar />
+    <PageShell class="flex-1 min-w-0">
+    <SubNavTabs class="lg:hidden" />
 
     <template v-if="loading">
       <div class="space-y-8">
@@ -63,4 +66,5 @@ onMounted(() => send())
       <p class="text-text-secondary">暂无数据，请先触发一次数据采集与分析</p>
     </div>
   </PageShell>
+  </div>
 </template>
