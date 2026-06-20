@@ -18,10 +18,19 @@ const option = computed<EChartsOption>(() => {
   const labels = raw.labels ?? []
   const xs = raw.x ?? []
   const ys = raw.y ?? []
+  const total = Math.min(labels.length, xs.length, ys.length)
 
-  // Convert parallel arrays to points grouped by cluster
+  if (total === 0) {
+    return {
+      title: { text: '暂无数据', left: 'center', top: 'center', textStyle: { color: '#9CA3AF', fontSize: 14 } },
+    }
+  }
+
+  // Downsample if too many points (max ~5000 for rendering performance)
+  const MAX_POINTS = 5000
+  const step = total <= MAX_POINTS ? 1 : Math.ceil(total / MAX_POINTS)
   const pointsByCluster: [number, number][][] = [[], [], []]
-  for (let i = 0; i < Math.min(labels.length, xs.length, ys.length); i++) {
+  for (let i = 0; i < total; i += step) {
     const c = labels[i]
     if (c >= 0 && c < 3) {
       pointsByCluster[c].push([xs[i], ys[i]])
@@ -32,8 +41,8 @@ const option = computed<EChartsOption>(() => {
     name: props.clusters[i]?.tag ?? `Cluster ${i}`,
     type: 'scatter' as const,
     data: pointsByCluster[i],
-    itemStyle: { color },
-    symbolSize: 6,
+    itemStyle: { color, opacity: 0.6 },
+    symbolSize: 4,
   }))
 
   series.push({
@@ -46,13 +55,12 @@ const option = computed<EChartsOption>(() => {
   } as any)
 
   return {
-    animation: true,
-    animationDuration: 300,
+    animation: false,
     tooltip: {
       trigger: 'item',
       formatter: (params: any) => {
-        const ci = params.seriesIndex
-        const tag = props.clusters[ci]?.tag ?? `Cluster ${ci}`
+        if (params.seriesIndex >= CLUSTER_COLORS.length) return `簇中心`
+        const tag = props.clusters[params.seriesIndex]?.tag ?? `Cluster ${params.seriesIndex}`
         return `${tag}<br/>x: ${params.value[0]?.toFixed(2)}<br/>y: ${params.value[1]?.toFixed(2)}`
       },
     },
