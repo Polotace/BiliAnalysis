@@ -24,11 +24,32 @@ data:
 # ── 定时调度 (可选) ──
 scheduler:
   pipelines:
+    # 爬取流水线：每周一早 9 点自动执行
     crawl:
-      schedule: "0 9 * * 1"       # 每周一早9点
+      schedule: "0 9 * * 1"
       steps: [crawl]
       step_failure: stop
+
+    # 分析流水线：手动触发
     analysis:
-      schedule: ""                 # 空字符串 = 仅手动触发
+      schedule: ""
       steps: [clean_data, statistics, clustering, prediction]
       step_failure: stop
+
+    # 数据入库流水线：手动触发
+    db_load:
+      schedule: ""
+      steps: [db_load]
+      step_failure: stop
+
+    # Warehouse 构建流水线：手动触发
+    warehouse:
+      schedule: ""
+      steps: [build_warehouse]
+      step_failure: stop
+
+    # 完整流水线：手动触发（爬取 + 分析 + 入库 + Warehouse 一站式）
+    full:
+      schedule: ""
+      steps: [crawl, clean_data, statistics, clustering, prediction, build_warehouse]
+      step_failure: skip

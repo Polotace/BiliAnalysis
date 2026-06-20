@@ -12,8 +12,8 @@ function isBrowseActive() {
 </script>
 
 <template>
-  <nav class="sticky top-0 z-100 bg-bg/85 backdrop-blur-[12px] border-b border-border">
-    <div class="max-w-[1280px] mx-auto px-6 flex items-center h-14 gap-8">
+  <nav class="sticky top-0 z-100 bg-bg/85 backdrop-blur-md border-b border-border">
+    <div class="max-w-7xl mx-auto px-6 flex items-center h-14 gap-8">
       <router-link to="/" class="text-lg font-bold text-text no-underline tracking-[-0.01em]">
         Bili<span class="text-blue">Insight</span>
       </router-link>
@@ -24,7 +24,7 @@ function isBrowseActive() {
             class="no-underline text-[0.9375rem] font-medium text-text-secondary px-0 py-1
                    transition-colors duration-200 relative
                    hover:text-text"
-            :class="{ '!text-text': route.path === '/' }"
+            :class="{ 'text-text!': route.path === '/' }"
           >
             发现
             <span
@@ -39,7 +39,7 @@ function isBrowseActive() {
             class="no-underline text-[0.9375rem] font-medium text-text-secondary px-0 py-1
                    transition-colors duration-200 relative
                    hover:text-text"
-            :class="{ '!text-text': isAnalysisActive() }"
+            :class="{ 'text-text!': isAnalysisActive() }"
           >
             分析
             <span
@@ -54,7 +54,7 @@ function isBrowseActive() {
             class="no-underline text-[0.9375rem] font-medium text-text-secondary px-0 py-1
                    transition-colors duration-200 relative
                    hover:text-text"
-            :class="{ '!text-text': isBrowseActive() }"
+            :class="{ 'text-text!': isBrowseActive() }"
           >
             浏览
             <span
@@ -64,7 +64,7 @@ function isBrowseActive() {
           </router-link>
           <div class="absolute top-full left-1/2 -translate-x-1/2 mt-3
                       bg-card rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.10)]
-                      border border-border p-1.5 min-w-[130px] flex flex-col
+                      border border-border p-1.5 min-w-32.5 flex flex-col
                       opacity-0 invisible group-hover:opacity-100 group-hover:visible
                       transition-[opacity,visibility] duration-150">
             <router-link to="/videos" class="block px-3.5 py-2 rounded-md text-sm text-text-secondary no-underline transition-colors duration-100 hover:bg-bg hover:text-text">视频库</router-link>
@@ -77,7 +77,7 @@ function isBrowseActive() {
       <router-link
         to="/admin"
         class="ml-auto no-underline text-text-secondary hover:text-text transition-colors"
-        :class="{ '!text-blue': route.path === '/admin' }"
+        :class="{ 'text-blue!': route.path === '/admin' }"
         title="管理后台"
       >
         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">

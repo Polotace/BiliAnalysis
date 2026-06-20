@@ -3,8 +3,8 @@ import time
 
 from bilianalysis.scheduler.task import Task, TaskResult, TaskContext
 from bilianalysis.scheduler.registry import register
-from app.api.db.loader import load_incremental, load_raw_weeks
-from app.api.config import ApiSettings
+from api.db.loader import load_incremental, load_raw_weeks
+from api.config import ApiSettings
 
 
 @register("db_load")

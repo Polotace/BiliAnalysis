@@ -13,6 +13,7 @@ from bilianalysis.engine.base import (
 from bilianalysis.scheduler.models import RunRecord
 from bilianalysis.scheduler.runner import PipelineRunner
 from api.deps import get_config, get_runner, get_engine
+from api.history import save_record
 from api.schemas import TaskTriggerResponse, AnalysisOverview
 
 router = APIRouter(tags=["analysis"])
@@ -68,6 +69,7 @@ async def trigger_analysis(
             record.status = "failed"
         finally:
             record.finished_at = datetime.now(timezone.utc)
+            save_record(record)
 
     asyncio.create_task(_run())
     return TaskTriggerResponse(run_id=record.run_id, pipeline="analysis")

@@ -10,6 +10,7 @@ from bilianalysis.scheduler.models import RunRecord
 from bilianalysis.scheduler.runner import PipelineRunner
 from api.deps import get_config, get_runner
 from api.errors import PipelineNotFound
+from api.history import save_record
 from api.schemas import (
     TaskTriggerResponse, PipelineInfo, PipelineListResponse, RunHistoryItem,
 )
@@ -59,6 +60,7 @@ async def trigger_pipeline(
             record.status = "failed"
         finally:
             record.finished_at = datetime.now(timezone.utc)
+            save_record(record)
 
     asyncio.create_task(_run())
     return TaskTriggerResponse(run_id=record.run_id, pipeline=name)
@@ -71,26 +73,26 @@ async def pipeline_history(
     request: Request,
     limit: int = 50,
 ):
-    """Get execution history for a pipeline."""
+    """Get execution history for a pipeline (from CSV)."""
     if name not in config.scheduler.pipelines:
         raise PipelineNotFound(name)
 
-    runs = [r for r in request.app.state.run_history if r.pipeline == name]
+    from api.history import load_records
+    rows = load_records()
     items = []
-    for r in runs[-limit:]:
-        failed_step = None
-        for sr in r.step_results:
-            if sr.status == "failed":
-                failed_step = sr.task_name
-                break
+    for row in rows:
+        if row.get("pipeline") != name:
+            continue
         items.append(RunHistoryItem(
-            run_id=r.run_id,
-            pipeline=r.pipeline,
-            trigger=r.trigger,
-            started_at=r.started_at,
-            finished_at=r.finished_at,
-            status=r.status,
-            step_count=len(r.step_results),
-            failed_step=failed_step,
+            run_id=row["run_id"],
+            pipeline=row["pipeline"],
+            trigger=row.get("trigger", "manual"),
+            started_at=row.get("started_at", ""),
+            finished_at=row.get("finished_at") or None,
+            status=row.get("status", "unknown"),
+            step_count=int(row.get("step_count", 0)),
+            failed_step=row.get("failed_step") or None,
         ))
+        if len(items) >= limit:
+            break
     return items
