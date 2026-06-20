@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useWeeksList } from '@/composables/useApi'
 import { ElScrollbar } from 'element-plus'
 import PageShell from '@/components/layout/PageShell.vue'
-import BrowseSidebar from '@/components/layout/BrowseSidebar.vue'
+import Sidebar from '@/components/layout/Sidebar.vue'
 import WeekCard from '@/components/business/WeekCard.vue'
 import type { WeekItem } from '@/types/api'
 
@@ -32,7 +32,7 @@ async function loadMore() {
 
 <template>
   <div class="flex h-full">
-    <BrowseSidebar />
+    <Sidebar />
     <PageShell class="!py-4 h-full flex flex-col flex-1 min-w-0">
     <div class="shrink-0 pb-6">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">每周必看</h1>

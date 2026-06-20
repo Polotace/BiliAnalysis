@@ -2,7 +2,7 @@
 import { onMounted } from 'vue'
 import { useCategoriesList } from '@/composables/useApi'
 import PageShell from '@/components/layout/PageShell.vue'
-import BrowseSidebar from '@/components/layout/BrowseSidebar.vue'
+import Sidebar from '@/components/layout/Sidebar.vue'
 import type { CategorySummary } from '@/types/api'
 
 const { data, loading, error, send } = useCategoriesList()
@@ -17,7 +17,7 @@ const COLORS = [
 
 <template>
   <div class="flex h-full">
-    <BrowseSidebar />
+    <Sidebar />
     <PageShell class="flex-1 min-w-0">
     <div class="pb-10">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">内容分区</h1>

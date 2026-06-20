@@ -2,7 +2,7 @@
 import { onMounted } from 'vue'
 import { usePredictions } from '@/composables/useApi'
 import PageShell from '@/components/layout/PageShell.vue'
-import BrowseSidebar from '@/components/layout/BrowseSidebar.vue'
+import Sidebar from '@/components/layout/Sidebar.vue'
 import SubNavTabs from '@/components/analysis/SubNavTabs.vue'
 import StatCard from '@/components/shared/StatCard.vue'
 import SectionHeader from '@/components/shared/SectionHeader.vue'
@@ -20,7 +20,7 @@ function fmtR2(v: number): string {
 
 <template>
   <div class="flex h-full">
-    <BrowseSidebar />
+    <Sidebar />
     <PageShell class="flex-1 min-w-0">
     <SubNavTabs class="lg:hidden" />
 
