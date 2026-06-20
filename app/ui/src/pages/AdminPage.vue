@@ -2,19 +2,19 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRequest } from 'alova/client'
 import PageShell from '@/components/layout/PageShell.vue'
-import SectionHeader from '@/components/shared/SectionHeader.vue'
 import StatCard from '@/components/shared/StatCard.vue'
 import {
-  fetchCrawlerStatus, triggerCrawler, triggerAnalysis, triggerDbLoad,
-  fetchAnalysisOverview, fetchPipelineList, fetchPipelineHistory,
-  triggerPipeline,
+  fetchCrawlerStatus, fetchAnalysisOverview, fetchPipelineList,
+  fetchPipelineHistory, triggerPipeline,
 } from '@/composables/useApi'
-import type { CrawlerStatus, AnalysisOverview, PipelineListResponse, RunHistoryItem } from '@/types/api'
+import type {
+  CrawlerStatus, AnalysisOverview, RunHistoryItem, PipelineInfo,
+} from '@/types/api'
 
 // ── Status data ──
 const { data: crawlerStatus, loading: csLoading, error: csError, send: csSend } =
   useRequest(fetchCrawlerStatus, { immediate: false })
-const { data: analysisOverview, loading: aoLoading, send: aoSend } =
+const { data: analysisOverview, send: aoSend } =
   useRequest(fetchAnalysisOverview, { immediate: false })
 const { data: pipelineList, send: plSend } =
   useRequest(fetchPipelineList, { immediate: false })
@@ -29,23 +29,36 @@ const history = ref<RunHistoryItem[]>([])
 const historyLoading = ref(false)
 const historyPipeline = ref('crawl')
 
-// ── Load all on mount ──
+// ── Pipeline colors ──
+const PIPELINE_COLORS: Record<string, string> = {
+  crawl: 'bg-blue',
+  analysis: 'bg-success',
+  warehouse: 'bg-[#F59E0B]',
+  db_load: 'bg-[#8B5CF6]',
+}
+const PIPELINE_ICONS: Record<string, string> = {
+  crawl: '☁',
+  analysis: '📊',
+  warehouse: '🏗',
+  db_load: '🗄',
+}
+
+// ── Load on mount ──
 onMounted(async () => {
   await Promise.all([csSend(), aoSend(), plSend()])
   await loadHistory()
 })
 
-async function doAction(label: string, fn: () => Promise<any>) {
-  actionLoading.value = label
+async function doAction(pl: PipelineInfo) {
+  actionLoading.value = pl.name
   actionResult.value = ''
   actionError.value = ''
   try {
-    const r = await fn()
-    actionResult.value = `${label} 已触发 (run_id=${r.run_id || 'OK'})`
-    // Refresh status after a short delay
+    const r = await triggerPipeline(pl.name)
+    actionResult.value = `✓ 流水线 ${pl.name} 已触发 (run_id=${(r as any).run_id ?? 'OK'})`
     setTimeout(async () => { await Promise.all([csSend(), aoSend()]) }, 1500)
   } catch (e: any) {
-    actionError.value = `${label} 失败: ${e.message || e}`
+    actionError.value = `流水线 ${pl.name} 失败: ${e.message || e}`
   } finally {
     actionLoading.value = ''
   }
@@ -72,6 +85,9 @@ function fmtTime(ts: string | null): string {
 function statusClass(s: string): string {
   return s === 'success' ? 'text-success' : s === 'running' ? 'text-warning' : 'text-danger'
 }
+function pipelineColor(name: string): string {
+  return PIPELINE_COLORS[name] ?? 'bg-text-secondary'
+}
 </script>
 
 <template>
@@ -81,17 +97,16 @@ function statusClass(s: string): string {
       <p class="text-[0.9375rem] text-text-secondary">数据采集、分析与入库管理</p>
     </div>
 
-    <!-- ── 仪表盘 ── -->
-    <SectionHeader title="仪表盘" description="系统当前状态" />
+    <!-- ── 系统状态 ── -->
+    <h2 class="text-[1.0625rem] font-semibold text-text mb-4">系统状态</h2>
 
-    <!-- Crawler Status -->
-    <div v-if="csLoading" class="grid grid-cols-4 gap-4 mb-8">
+    <div v-if="csLoading" class="grid grid-cols-4 gap-4 mb-4">
       <div v-for="i in 4" :key="i" class="h-24 bg-card rounded-[12px] animate-pulse" />
     </div>
-    <div v-else-if="csError" class="text-text-secondary mb-8">状态加载失败: {{ (csError as Error).message }}</div>
-    <div v-else-if="crawlerStatus" class="grid grid-cols-4 gap-4 mb-8">
+    <div v-else-if="csError" class="text-text-secondary mb-4">状态加载失败: {{ (csError as Error).message }}</div>
+    <div v-else-if="crawlerStatus" class="grid grid-cols-4 gap-4 mb-4">
       <StatCard label="数据周次" :value="crawlerStatus.total_weeks" />
-      <StatCard label="已爬取" :value="crawlerStatus.crawled" sub-label="成功入库" />
+      <StatCard label="已爬取" :value="crawlerStatus.crawled" sub-label="成功" />
       <StatCard label="失败" :value="Object.keys(crawlerStatus.failed).length" sub-label="待重试" />
       <StatCard
         label="状态"
@@ -100,75 +115,67 @@ function statusClass(s: string): string {
       />
     </div>
 
-    <!-- Analysis Status -->
-    <div v-if="analysisOverview" class="grid grid-cols-4 gap-4 mb-8">
-      <StatCard label="清洗报告" :value="analysisOverview.last_clean ? '✅' : '—'" :sub-label="analysisOverview.last_clean ? `${analysisOverview.last_clean.total_videos} 视频` : '未生成'" />
-      <StatCard label="统计报告" :value="analysisOverview.last_stats ? '✅' : '—'" :sub-label="analysisOverview.last_stats ? `${analysisOverview.last_stats.overall.total_videos} 视频` : '未生成'" />
-      <StatCard label="聚类报告" :value="analysisOverview.last_cluster ? '✅' : '—'" :sub-label="analysisOverview.last_cluster ? `silhouette=${analysisOverview.last_cluster.clusters.silhouette_score}` : '未生成'" />
-      <StatCard label="预测报告" :value="analysisOverview.last_prediction ? '✅' : '—'" :sub-label="analysisOverview.last_prediction ? `view R²=${analysisOverview.last_prediction.view_predict.r2_score}` : '未生成'" />
+    <div v-if="analysisOverview" class="flex gap-2 flex-wrap mb-6">
+      <span
+        v-for="item in [
+          {ready:!!analysisOverview.last_clean,label:'清洗报告',sub:analysisOverview.last_clean?.total_videos+' 视频'},
+          {ready:!!analysisOverview.last_stats,label:'统计报告',sub:analysisOverview.last_stats?.overall.total_videos+' 视频'},
+          {ready:!!analysisOverview.last_cluster,label:'聚类报告',sub:'silhouette='+analysisOverview.last_cluster?.clusters.silhouette_score},
+          {ready:!!analysisOverview.last_prediction,label:'预测报告',sub:'view R²='+analysisOverview.last_prediction?.view_predict.r2_score},
+        ]"
+        :key="item.label"
+        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium"
+        :class="item.ready ? 'bg-[#ECFDF5] text-[#166534]' : 'bg-[#F3F4F6] text-text-secondary'"
+      >
+        {{ item.ready ? '✓' : '—' }} {{ item.label }}
+        <span class="opacity-60 font-normal">· {{ item.sub }}</span>
+      </span>
     </div>
 
     <!-- ── 操作面板 ── -->
-    <SectionHeader title="操作面板" description="手动触发任务" />
-    <div class="flex flex-wrap gap-3 mb-2">
-      <button
-        v-for="btn in [
-          {label:'触发爬取', fn:()=>doAction('爬取', ()=>triggerCrawler()), color:'bg-blue'},
-          {label:'触发分析', fn:()=>doAction('分析', ()=>triggerAnalysis()), color:'bg-success'},
-          {label:'入库 PG', fn:()=>doAction('入库', ()=>triggerDbLoad()), color:'bg-warning'},
-        ]"
-        :key="btn.label"
-        @click="btn.fn"
-        :disabled="actionLoading !== ''"
-        class="px-5 py-2.5 rounded-[12px] text-white font-medium text-sm border-none cursor-pointer
-               transition-opacity duration-200 hover:opacity-85 disabled:opacity-50"
-        :class="btn.color"
-      >
-        <span v-if="actionLoading === btn.label" class="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2 align-middle" />
-        {{ btn.label }}
-      </button>
-
-      <!-- Pipeline trigger buttons -->
+    <h2 class="text-[1.0625rem] font-semibold text-text mb-4">操作面板</h2>
+    <div class="flex flex-wrap gap-3 mb-3">
       <template v-if="pipelineList">
         <button
           v-for="pl in pipelineList.pipelines"
           :key="pl.name"
-          @click="doAction(pl.name, () => triggerPipeline(pl.name))"
+          @click="doAction(pl)"
           :disabled="actionLoading !== ''"
-          class="px-5 py-2.5 rounded-[12px] text-white font-medium text-sm border-none cursor-pointer
-                 transition-opacity duration-200 hover:opacity-85 disabled:opacity-50"
-          :class="pl.name === 'warehouse' ? 'bg-[#8B5CF6]' : 'bg-text-secondary'"
+          class="px-5 py-3 rounded-[12px] text-white font-semibold text-sm border-none cursor-pointer
+                 transition-opacity duration-200 hover:opacity-85 disabled:opacity-50 text-left"
+          :class="pipelineColor(pl.name)"
         >
           <span v-if="actionLoading === pl.name" class="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2 align-middle" />
-          流水线: {{ pl.name }}
+          {{ PIPELINE_ICONS[pl.name] ?? '▶' }} 流水线: {{ pl.name }}
+          <span class="block text-[0.6875rem] font-normal opacity-70 mt-0.5">{{ pl.steps.join(' → ') || '手动触发' }}</span>
         </button>
       </template>
+      <p v-else class="text-text-secondary text-sm">加载流水线列表…</p>
     </div>
 
-    <!-- Action feedback -->
-    <div
-      v-if="actionResult"
-      class="mb-4 p-3 rounded-[8px] bg-[#ECFDF5] text-success text-sm border border-success/20"
-    >{{ actionResult }}</div>
-    <div
-      v-if="actionError"
-      class="mb-4 p-3 rounded-[8px] bg-[#FEF2F2] text-danger text-sm border border-danger/20"
-    >{{ actionError }}</div>
+    <div v-if="actionResult" class="mb-3 p-3 rounded-lg bg-[#ECFDF5] text-[#166534] text-sm border border-[#A7F3D0] font-medium">
+      {{ actionResult }}
+    </div>
+    <div v-if="actionError" class="mb-3 p-3 rounded-lg bg-[#FEF2F2] text-[#991B1B] text-sm border border-[#FECACA] font-medium">
+      {{ actionError }}
+    </div>
 
     <!-- ── 执行历史 ── -->
-    <SectionHeader title="执行历史" description="最近任务执行记录" />
+    <h2 class="text-[1.0625rem] font-semibold text-text mb-4">执行历史</h2>
     <div class="flex gap-2 mb-4 flex-wrap">
-      <button
-        v-for="name in ['crawl', 'analysis', 'warehouse']"
-        :key="name"
-        @click="switchHistory(name)"
-        class="px-4 py-1.5 border rounded-[20px] text-sm font-medium transition-colors cursor-pointer"
-        :class="historyPipeline === name
-          ? 'bg-blue text-white border-blue'
-          : 'bg-card text-text-secondary border-border hover:border-blue hover:text-blue'"
-      >
-        {{ name }}
-      </button>
+      <template v-if="pipelineList">
+        <button
+          v-for="pl in pipelineList.pipelines"
+          :key="pl.name"
+          @click="switchHistory(pl.name)"
+          class="px-4 py-1.5 border rounded-[20px] text-sm font-medium transition-colors cursor-pointer"
+          :class="historyPipeline === pl.name
+            ? 'bg-blue text-white border-blue'
+            : 'bg-card text-text-secondary border-border hover:border-blue hover:text-blue'"
+        >
+          {{ pl.name }}
+        </button>
+      </template>
     </div>
 
     <div v-if="historyLoading" class="text-text-secondary text-sm py-4">加载中…</div>
