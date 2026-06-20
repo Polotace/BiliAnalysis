@@ -37,19 +37,25 @@ const COLORS = [
     </div>
 
     <div v-else-if="data" class="grid grid-cols-4 gap-4 pb-12">
-      <div
+      <router-link
         v-for="(c, i) in data"
         :key="c.tid"
-        class="bg-card rounded-[12px] p-6 shadow-(--shadow-default)
-               border-t-[3px] transition-shadow duration-200 hover:shadow-(--shadow-hover)"
+        :to="`/videos?category_tid=${c.tid}`"
+        class="group bg-card rounded-[12px] p-6 shadow-(--shadow-default)
+               border-t-[3px] transition-all duration-200 hover:shadow-(--shadow-hover)
+               hover:-translate-y-0.5 cursor-pointer no-underline block"
         :style="{ borderTopColor: COLORS[i % COLORS.length] }"
       >
-        <p class="text-base font-semibold text-text mb-2">{{ c.tname || `分区 ${c.tid}` }}</p>
+        <div class="flex items-start justify-between mb-2">
+          <p class="text-base font-semibold text-text group-hover:text-blue transition-colors">{{ c.tname || `分区 ${c.tid}` }}</p>
+          <svg class="w-4 h-4 text-text-secondary/30 group-hover:text-blue group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/>
+          </svg>
+        </div>
         <p class="text-[1.5rem] font-bold tabular text-text">{{ c.video_count }}</p>
         <p class="text-xs text-text-secondary mt-1">个视频</p>
-        <p v-if="c.tname_v2" class="text-xs text-text-secondary mt-2">{{ c.tname_v2 }}</p>
-      </div>
+        <p v-if="c.tname_v2" class="text-xs text-text-secondary mt-2 group-hover:text-text transition-colors">{{ c.tname_v2 }}</p>
+      </router-link>
     </div>
   </PageShell>
-  </div>
 </template>

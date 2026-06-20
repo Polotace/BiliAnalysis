@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { fetchVideos, fetchCategories } from '@/composables/useApi'
 import { useRequest } from 'alova/client'
 import { ElScrollbar } from 'element-plus'
@@ -10,6 +11,8 @@ import SortTabs from '@/components/business/SortTabs.vue'
 import FilterDropdown from '@/components/business/FilterDropdown.vue'
 import VideoCard from '@/components/business/VideoCard.vue'
 import type { VideoSummary, CategorySummary } from '@/types/api'
+
+const route = useRoute()
 
 const search = ref('')
 const sortBy = ref('view')
@@ -81,6 +84,12 @@ async function loadMore() {
 }
 
 onMounted(async () => {
+  // Read initial filter from URL query param (e.g. /videos?category_tid=123)
+  const tidParam = route.query.category_tid
+  if (tidParam) {
+    categoryTid.value = Number(tidParam)
+  }
+
   const cats = await loadCategories()
   if (cats) categories.value = cats as any
   await loadPage()
