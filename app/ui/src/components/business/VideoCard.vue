@@ -22,7 +22,7 @@ function openBili() {
            transition-shadow duration-200 hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5
            cursor-pointer no-underline"
   >
-    <div class="relative h-[180px] bg-border overflow-hidden">
+    <div class="relative h-45 bg-border overflow-hidden">
       <img
         v-if="proxyImage(video.cover_url)"
         :src="proxyImage(video.cover_url)!"
@@ -43,8 +43,10 @@ function openBili() {
                shadow-sm"
         title="在B站观看"
       >
-        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-          <path d="M11.176 14.717a.527.527 0 0 1-.533.531h-2.128a.533.533 0 0 1-.533-.531V9.24c0-.295.24-.533.533-.533h2.128c.295 0 .533.24.533.533v5.477zm3.062-3.527-1.645 3.43a.535.535 0 0 1-.484.301.5.5 0 0 1-.195-.038.53.53 0 0 1-.297-.68l1.676-3.466-1.659-3.466a.533.533 0 0 1 .969-.428l1.635 3.435a.6.6 0 0 1 0 .48v.432zM2 5.006C2 3.346 3.346 2 5.006 2h13.988C20.654 2 22 3.346 22 5.006v13.988A3.006 3.006 0 0 1 18.994 22H5.006A3.006 3.006 0 0 1 2 18.994V5.006zM5.006 4h13.988C19.55 4 20 4.45 20 5.006v13.988c0 .557-.45 1.006-1.006 1.006H5.006C4.45 20 4 19.55 4 18.994V5.006C4 4.45 4.45 4 5.006 4z" fill-rule="evenodd"/>
+        <svg class="w-3 h-3" viewBox="0 0 24 24" fill="#00AEEC">
+          <rect x="4" y="5" width="16" height="13" rx="1.5" stroke="#00AEEC" stroke-width="2" fill="none"/>
+          <line x1="8" y1="2" x2="8" y2="5" stroke="#00AEEC" stroke-width="2" stroke-linecap="round"/>
+          <line x1="16" y1="2" x2="16" y2="5" stroke="#00AEEC" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </span>
       <span
