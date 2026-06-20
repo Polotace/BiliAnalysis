@@ -27,6 +27,7 @@ const router = createRouter({
       path: '/videos',
       name: 'videos',
       component: () => import('@/pages/browse/VideoLibraryPage.vue'),
+      meta: { keepAlive: true },
     },
     {
       path: '/videos/:aid',
@@ -37,6 +38,7 @@ const router = createRouter({
       path: '/weeks',
       name: 'weeks',
       component: () => import('@/pages/browse/WeeksPage.vue'),
+      meta: { keepAlive: true },
     },
     {
       path: '/weeks/:number',
@@ -47,6 +49,7 @@ const router = createRouter({
       path: '/creators',
       name: 'creators',
       component: () => import('@/pages/browse/CreatorsPage.vue'),
+      meta: { keepAlive: true },
     },
     {
       path: '/creators/:mid',
@@ -64,7 +67,10 @@ const router = createRouter({
       component: () => import('@/pages/AdminPage.vue'),
     },
   ],
-  scrollBehavior() {
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) {
+      return savedPosition
+    }
     return { top: 0 }
   },
 })

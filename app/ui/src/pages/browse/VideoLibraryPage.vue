@@ -66,7 +66,7 @@ onMounted(() => loadPage())
 
 <template>
   <PageShell>
-    <div class="py-10">
+    <div class="pb-10">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">发现好内容</h1>
       <p class="text-[0.9375rem] text-text-secondary">
         浏览 B站「每周必看」的 <span class="tabular font-semibold text-text">{{ total }}</span> 个精选视频

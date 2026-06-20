@@ -16,7 +16,7 @@ const COLORS = [
 
 <template>
   <PageShell>
-    <div class="py-10">
+    <div class="pb-10">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">内容分区</h1>
       <p class="text-[0.9375rem] text-text-secondary">
         覆盖 <span class="tabular font-semibold text-text">{{ data?.length ?? 0 }}</span> 个分区
@@ -24,7 +24,7 @@ const COLORS = [
     </div>
 
     <div v-if="loading" class="grid grid-cols-4 gap-4 pb-8">
-      <div v-for="i in 8" :key="i" class="h-[120px] bg-card rounded-[12px] animate-pulse" />
+      <div v-for="i in 8" :key="i" class="h-30 bg-card rounded-[12px] animate-pulse" />
     </div>
 
     <div v-else-if="error" class="py-24 text-center">
@@ -37,8 +37,8 @@ const COLORS = [
       <div
         v-for="(c, i) in data"
         :key="c.tid"
-        class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)]
-               border-t-[3px] transition-shadow duration-200 hover:shadow-[var(--shadow-hover)]"
+        class="bg-card rounded-[12px] p-6 shadow-(--shadow-default)
+               border-t-[3px] transition-shadow duration-200 hover:shadow-(--shadow-hover)"
         :style="{ borderTopColor: COLORS[i % COLORS.length] }"
       >
         <p class="text-base font-semibold text-text mb-2">{{ c.tname || `分区 ${c.tid}` }}</p>

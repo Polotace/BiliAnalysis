@@ -55,7 +55,7 @@ function fmt(n: number): string {
         </div>
       </div>
 
-      <h2 class="text-lg font-semibold text-text mb-4">作品<small class="text-gray-300">仅展示必看作品</small></h2>
+      <h2 class="text-lg font-semibold text-text mb-4">作品</h2>
       <div class="grid grid-cols-3 gap-5 pb-12">
         <VideoCard v-for="v in data.videos" :key="v.aid" :video="v" />
       </div>

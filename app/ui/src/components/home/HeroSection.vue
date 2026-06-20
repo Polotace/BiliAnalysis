@@ -8,12 +8,12 @@
       基于B站「每周必看」数据，发现优质创作者、热门品类与内容趋势
     </p>
     <router-link
-      to="/analysis/stats"
+      to="/videos"
       class="inline-block px-7 py-2.5 bg-blue text-white no-underline
              rounded-[12px] font-medium transition-colors duration-200
              hover:bg-[#0099D6]"
     >
-      探索数据
+      浏览视频库
     </router-link>
   </section>
 </template>

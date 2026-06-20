@@ -16,7 +16,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
              transition-colors duration-150 cursor-pointer
              hover:border-blue hover:text-blue"
       :class="modelValue === opt.key
-        ? 'bg-blue text-white border-blue'
+        ? 'bg-blue text-white border-blue hover:text-white'
         : 'bg-card text-text-secondary'"
     >
       {{ opt.label }}

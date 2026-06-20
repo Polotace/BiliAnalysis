@@ -31,7 +31,7 @@ async function loadMore() {
 
 <template>
   <PageShell>
-    <div class="py-10">
+    <div class="pb-10">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">每周必看</h1>
       <p class="text-[0.9375rem] text-text-secondary">
         从 2019 年至今，已收录 <span class="tabular font-semibold text-text">{{ weeks.length }}</span> 期周报
