@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { fetchVideos, fetchCategories } from '@/composables/useApi'
 import { useRequest } from 'alova/client'
@@ -93,6 +93,15 @@ onMounted(async () => {
   const cats = await loadCategories()
   if (cats) categories.value = cats as any
   await loadPage()
+})
+
+// Re-filter when URL query param changes (keep-alive navigation)
+watch(() => route.query.category_tid, (newVal) => {
+  const tid = newVal ? Number(newVal) : null
+  if (categoryTid.value !== tid) {
+    categoryTid.value = tid
+    resetAndLoad()
+  }
 })
 </script>
 
