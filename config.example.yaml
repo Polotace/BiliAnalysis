@@ -35,6 +35,12 @@ scheduler:
       steps: [clean_data, statistics, clustering, prediction, keywords]
       step_failure: stop
 
+    # 关键词提取流水线：手动触发
+    keywords:
+      schedule: ""
+      steps: [keywords]
+      step_failure: stop
+
     # 数据入库流水线：手动触发
     db_load:
       schedule: ""
