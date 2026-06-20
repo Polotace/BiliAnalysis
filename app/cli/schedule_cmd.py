@@ -93,6 +93,45 @@ def run_cmd(
     console.print(f"\n[{status_color}]Pipeline '{pipeline}': {record.status}[/{status_color}]")
 
 
+@schedule_app.command("run-task")
+def run_task_cmd(
+    task: str = typer.Option(..., "--task", "-t", help="Task name to run"),
+    config_path: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
+):
+    """Run a single task independently (not as part of a pipeline)."""
+    import asyncio
+    import time
+    from bilianalysis.scheduler.task import TaskContext
+    from bilianalysis.engine import create_engine
+
+    import bilianalysis.scheduler.builtins  # noqa: F401
+    import app.api.tasks                  # noqa: F401
+
+    config = load_config(config_path)
+    try:
+        task_cls = get_task(task)
+    except KeyError:
+        console.print(f"[red]Task '{task}' not found. Available: {', '.join(list_tasks())}[/red]")
+        raise typer.Exit(1)
+
+    ctx = TaskContext(config=config)
+    engine = create_engine(config)
+    ctx.engine = engine
+
+    console.print(f"[bold]Running task: {task}[/bold]")
+    start = time.monotonic()
+    result = asyncio.run(task_cls().run(ctx))
+    elapsed = time.monotonic() - start
+
+    if result.status == "success":
+        console.print(f"[green]✔ {task} completed in {elapsed:.1f}s[/green]")
+        if result.output:
+            for k, v in result.output.items():
+                console.print(f"  {k}: {v}")
+    else:
+        console.print(f"[red]✘ {task} failed: {result.error}[/red]")
+
+
 @schedule_app.command("test")
 def test_cmd(
     pipeline: str = typer.Option(..., "--pipeline", "-p", help="Pipeline name"),
