@@ -4,197 +4,139 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BiliInsight — Bilibili "每周必看" (Weekly Must-Watch) content insight platform. Crawl video data from Bilibili's weekly must-watch API, analyze with dual Pandas/PySpark engines, serve via FastAPI, visualize with Vue3 + ECharts.
+BiliInsight — Bilibili "每周必看" content insight platform. Crawl video data from Bilibili API, analyze with Pandas engine, serve via FastAPI + PostgreSQL, visualize with Vue3 + ECharts + Element Plus.
 
-**Current status**: Crawler, engines (Pandas + Spark), scheduler, config, FastAPI skeleton (crawler/analysis/tasks/config endpoints), and Vue3 frontend (home/stats/clusters/predictions 4 pages) are built. Next: PostgreSQL integration, ETL/warehouse modules, business detail endpoints, and remaining frontend pages.
-
-Architecture design: `docs/new-scheme.md` | Original plan: `docs/README.md` | Dev docs: `docs/dev/`
+**Current status**: Crawler (anti-bot hardened), Pandas engine (4-step pipeline), warehouse (DWD/DWS/ADS), scheduler (7 registered tasks), FastAPI (10 router groups), PostgreSQL integration (schema + loader + business queries), Vue3 frontend (12 pages + 26 components), admin backend page. Content analysis (jieba NLP + word cloud) is the next phase.
 
 ## Commands
 
-| Command                                                                  | Purpose                           |
-|--------------------------------------------------------------------------|-----------------------------------|
-| `uv sync`                                                                | Install all dependencies          |
-| `uv add <pkg>`                                                           | Add a runtime dependency          |
-| `uv add --dev <pkg>`                                                     | Add a dev dependency              |
-| `uv run pytest tests/ -v`                                                | Run all 109 tests                 |
-| `uv run pytest tests/test_storage.py -v`                                 | Run a single test file            |
-| `uv run pytest tests/test_pipeline.py::TestRun::test_concurrent_mode -v` | Run a single test                 |
-| `uv run pytest tests/ -v -k "crawl"`                                     | Run tests matching keyword        |
-| `uv run python -c "..."`                                                 | Run inline Python with venv       |
-| `uv run mypy .`                                                          | Run static type checking for code |
-| `cd app/ui && pnpm dev`                                                  | Start frontend dev server         |
-| `cd app/ui && pnpm build`                                                | Build frontend for production     |
-| `cd app/ui && pnpm test:unit`                                            | Run Vitest unit tests             |
-| `cd app/ui && pnpm test:e2e`                                             | Run Playwright e2e visual tests   |
-| `uv run uvicorn api.app:create_app --reload`                             | Start FastAPI dev server          |
+| Command | Purpose |
+|---------|---------|
+| `uv sync` | Install all Python dependencies |
+| `uv add <pkg>` | Add a runtime dependency |
+| `uv run pytest tests/ -v` | Run all 143 backend tests |
+| `uv run pytest tests/test_engine.py -v` | Run a single test file |
+| `uv run pytest tests/ -v -k "crawl"` | Run tests matching keyword |
+| `uv run bilianalysis serve --port 8080` | Start FastAPI dev server |
+| `cd app/ui && pnpm dev` | Start frontend dev server (port 5173, proxies /api → 8080) |
+| `cd app/ui && pnpm build` | Build frontend for production |
+| `cd app/ui && pnpm test:unit` | Run Vitest unit tests (14 tests) |
+| `cd app/ui && pnpm test:e2e` | Run Playwright e2e tests |
 
 ## Architecture
-
-### Package structure
-
-```
-src/bilianalysis/          # Pure Python library — NO database drivers allowed
-├── crawler/               # Data collection (complete)
-│   ├── api.py             #   Bilibili API wrapper
-│   ├── pipeline.py        #   Orchestration: rate limiting, retry, resume, session rotation
-│   ├── storage.py         #   File I/O + progress tracking
-│   └── signer.py          #   WBI signing
-├── engine/                # Analysis engines (complete)
-│   ├── base.py            #   ABC + 4 report models
-│   ├── pandas_engine.py   #   Pandas implementation (543 lines)
-│   └── spark_engine.py    #   PySpark implementation (590 lines)
-├── scheduler/             # Task orchestration (complete)
-│   ├── task.py / registry.py / runner.py / cron_service.py / models.py
-│   └── builtins/          #   5 tasks: crawl, clean_data, statistics, clustering, prediction
-├── config/                # Configuration (complete)
-├── utils/                 # HTTP: fetch.py + ua.py
-├── models.py              # Domain models
-├── etl/                   # [planned] Data transform: raw JSON → typed records, no DB
-└── warehouse/             # [planned] DWD/DWS/ADS Parquet + keywords analysis
-
-app/                       # Application layer (partial)
-├── api/                   # FastAPI — 4 router groups: crawler, analysis, tasks, config
-└── ui/                    # Vue3 — 4 pages: Home, Stats, Clusters, Predictions
-                           #   Vue 3.5 + Element Plus + ECharts + Alova + TailwindCSS 4
-```
 
 ### Critical constraint: library vs application boundary
 
 ```
-src/bilianalysis/  →  Pure Python: compute, transform, file I/O, Parquet.
+src/bilianalysis/  →  Pure Python library — compute, transform, file I/O, Parquet.
                       MUST NOT import sqlalchemy, asyncpg, or any DB driver.
+                      MUST NOT import from app/.
 app/api/           →  FastAPI app. The ONLY module allowed to connect to PostgreSQL.
+app/api/tasks/     →  Scheduler tasks that need DB access (e.g. db_load).
+                      Registered via @register just like library tasks.
+app/cli/           →  Typer CLI (serve + schedule subcommands).
 app/ui/            →  Vue3 frontend. Communicates with app/api/ via HTTP (Alova).
+```
+
+### Package structure
+
+```
+src/bilianalysis/
+├── crawler/          # Bilibili API + anti-bot pipeline
+│   ├── api.py        #   list_series, get_weekly_videos, get_creator_relation_stats
+│   ├── pipeline.py   #   Sequential crawl: rate limiting, retry, WBI key refresh,
+│   │                 #   session rotation, device fingerprint, exponential backoff
+│   ├── storage.py    #   ProgressFile (Pydantic + asyncio.Lock)
+│   └── signer.py     #   WBI signing (w_rid, wts, web_location variants)
+├── engine/           # PandasEngine: clean_data → statistics → clustering → prediction
+├── warehouse/        # DWD (fact) → DWS (creator/category/weekly aggregates) → ADS (4 tables)
+├── scheduler/        # @register decorator, PipelineRunner, CronService
+│   └── builtins/     # 6 library tasks: crawl, clean_data, statistics, clustering,
+│                     #   prediction, build_warehouse
+├── config/           # YAML + env var → AppConfig Pydantic
+├── utils/            # fetch.py (aiohttp + device fingerprint), ua.py (fake-useragent)
+├── etl/              # transform_week(): raw JSON → typed records (pure, no DB)
+└── nlp/              # [planned] jieba keyword extraction
 ```
 
 ### Data flow
 
 ```
-Bilibili API → Crawler (aiohttp) → data/raw/*.json
-                                      │
-                  ┌───────────────────┴───────────────────┐
-                  ▼                                       ▼
-    Track A: PostgreSQL (business)          Track B: Engine (analytics)
-    src/bilianalysis/etl/transform.py     clean_data() → 5 Parquet tables
-    (pure functions, no DB)                statistics() → StatReport JSON
-           │                               clustering() → ClusterReport JSON
-           ▼                               prediction() → PredictionReport JSON
-    app/api/db/loader.py                         │
-    (only place that executes SQL)               ▼
-           │                           data/processed/*.parquet
-           ▼                           data/reports/*.json
-        PostgreSQL                              │
-           │                                    │
-           └────────────┬───────────────────────┘
-                        ▼
-                  FastAPI (app/api/)
-                  reads PG for business queries,
-                  reads report files for analytics
-                        │
-                        ▼
-                  Vue3 (app/ui/)
+Bilibili API → Crawler → data/raw/*.json
+                              │
+          ┌───────────────────┴───────────────────┐
+          ▼                                       ▼
+Track A: PostgreSQL (business queries)     Track B: Engine (analytics)
+  transform_week() → loader.py → PG         clean_data() → 5 Parquet tables
+  API reads PG via queries.py               statistics/clustering/prediction → JSON reports
+          │                                       │
+          └──────────────┬────────────────────────┘
+                         ▼
+                   FastAPI (10 router groups)
+                         │
+                         ▼
+                   Vue3 (12 pages)
 ```
 
-The two tracks are independent — both source from raw JSON, neither blocks the other. Parquet = columnar analytics, PostgreSQL = row-based API queries. See `docs/new-scheme.md` §3.2 for rationale.
+### Frontend pages (12)
 
-### Engine pipeline (4 steps)
+| Route | Page | Section |
+|-------|------|---------|
+| `/` | HomePage | 发现 |
+| `/videos` | VideoLibraryPage | 浏览 |
+| `/videos/:aid` | VideoDetailPage | 浏览 |
+| `/weeks` | WeeksPage | 浏览 |
+| `/weeks/:number` | WeekDetailPage | 浏览 |
+| `/creators` | CreatorsPage | 浏览 |
+| `/creators/:mid` | CreatorDetailPage | 浏览 |
+| `/categories` | CategoriesPage | 浏览 |
+| `/analysis/stats` | StatsPage | 分析 |
+| `/analysis/clusters` | ClusterPage | 分析 |
+| `/analysis/predictions` | PredictPage | 分析 |
+| `/admin` | AdminPage | 管理 |
 
-```
-create_engine(config) → PandasEngine or SparkEngine
-  1. clean_data()    → CleanReport    (raw JSON → 5 Parquet tables, dedup/fill/outlier)
-  2. statistics()    → StatReport     (join + groupby → overall, by_category, by_creator, by_week)
-  3. clustering()    → ClusterReport  (KMeans k=3 + PCA scatter + silhouette score)
-  4. prediction()    → PredictionReport (LinearRegression + 4-week forecast)
-```
+Navigation: TopNav has 发现 | 分析 | 浏览 (dropdown on mobile, Sidebar on desktop).
+Sidebar auto-switches between browse and analysis sub-nav based on route.
+Keep-alive caches HomePage, VideoLibraryPage, WeeksPage, CreatorsPage.
 
-Engine factory at `engine/__init__.py` — `create_engine(config)` returns the right engine based on `config.analysis.engine`. Each engine writes reports to `data/reports/` after each step.
+### Scheduler tasks (7 registered)
 
-### Scheduler design
+`crawl`, `clean_data`, `statistics`, `clustering`, `prediction`, `build_warehouse`, `db_load`
 
-- **Task**: Abstract class with `async run(ctx: TaskContext) → TaskResult`. Registered via `@register("name")`.
-- **TaskContext**: Carries `config: AppConfig` and `engine: AnalysisEngine` (lazily created). `ctx.previous` dict holds results from earlier steps.
-- **PipelineRunner**: Executes a pipeline's steps sequentially. Failure mode per pipeline: `stop` (halt), `skip` (continue), or `retry` (re-attempt N times).
-- **CronService**: Wraps PipelineRunner with APScheduler cron triggers. Reads schedule from config.
-- **Built-in tasks**: `crawl`, `clean_data`, `statistics`, `clustering`, `prediction` — each registered at import time in `builtins/__init__.py`.
+`db_load` lives in `app/api/tasks/` (needs PostgreSQL). Library tasks auto-register via
+`import bilianalysis.scheduler.builtins`; app tasks via `import app.api.tasks`.
 
 ### Config system
 
-`config.yaml` → `load_config()` → `AppConfig` Pydantic model with four sections:
-- `crawler:` — request_delay, max_retries, retry_delay, cookie, key_refresh_interval, max_requests_per_session
-- `analysis:` — engine (pandas | spark)
-- `data:` — raw_dir, processed_dir, reports_dir
-- `scheduler:` — pipelines map (name → schedule + steps + failure mode)
+`config.yaml` → `load_config()` → `AppConfig` with four sections: `crawler`, `analysis`, `data`, `scheduler`.
+Database URL lives in `app/api/config.py` (pydantic-settings, `.env` file), not in global config.
+Pipeline steps are registered task names; failure mode per pipeline: `stop` / `skip` / `retry`.
 
-Global config does NOT include database settings — those belong to the FastAPI app (`app/api/config.py`).
+### Anti-crawl measures
+
+- Device fingerprint cookies: buvid3/4, b_lsid via `make_device_cookie()`
+- Header rotation: Referer (4 variants), Accept-Language (3 variants), User-Agent
+- WBI signing with ms-precision wts, web_location variants, proactive key refresh
+- Global shared rate-limit state with exponential backoff (×2 on -352, ×3 on 412)
+- Session rotation on consecutive -352 hits (new device ID)
+- Image proxy endpoint (`/api/proxy/image`) for Bilibili CDN covers (Referer required)
 
 ## Key Design Decisions
 
-- **Session-injected HTTP**: `fetch.py` does NOT own the aiohttp session — callers create and inject it. Enables connection pool sharing.
-- **_jitter**: ±1s random offset on all sleep durations for anti-bot mitigation.
-- **ProgressFile**: Pydantic `BaseModel` with `asyncio.Lock` for concurrent safety. Tracks `crawled`, `failed`, `last_run`.
-- **Retry strategy**: New weeks get `max_retries`; previously-failed weeks get 1 retry per `run()`. -404 = permanent skip.
-- **Engine abstraction**: `AnalysisEngine` ABC with 4 async/sync steps. Switch via config, not code change.
-- **Parquet as analysis format**: Columnar, compressed, native to both Pandas and Spark. Not used for API point queries.
-- **Library/app separation**: `src/bilianalysis/` is a pure library (no DB drivers). Only `app/api/` touches PostgreSQL. See §3.3 of `docs/new-scheme.md`.
-- **Config ownership**: `config.yaml` = library + scheduler. Database URL = `app/api/` private config.
-- **WBI signing**: Bilibili API requires signed parameters. `signer.py` handles key derivation and parameter signing, with auto-refresh on auth failures.
-
-## Public API Summary
-
-### Crawler (`from bilianalysis.crawler import`)
-| Export | Kind | Description |
-|--------|------|-------------|
-| `CrawlRunner` | async fn | Main entry: `await CrawlRunner(config) -> CrawlReport` |
-| `CrawlConfig` | Pydantic | `request_delay`, `max_retries`, `retry_delay`, `cookie`, etc. |
-| `CrawlReport` | Pydantic | `total`, `crawled`, `skipped`, `failed`, `failed_weeks`, `duration_seconds` |
-| `ProgressFile` | Pydantic | `crawled`, `failed`, `last_run` |
-| `save_week` / `load_progress` / `save_progress` / `get_pending_weeks` | async fn | Storage helpers |
-| `list_series` / `get_weekly_videos` | async fn | API calls |
-| `BASE_URL` | str | Bilibili API base URL |
-
-### Engine (`from bilianalysis.engine import`)
-| Export | Kind | Description |
-|--------|------|-------------|
-| `create_engine(config)` | fn | Factory: returns `PandasEngine` or `SparkEngine` |
-| `AnalysisEngine` | ABC | Abstract base with 4 methods |
-| `PandasEngine` / `SparkEngine` | class | Concrete implementations |
-| `CleanReport` / `StatReport` / `ClusterReport` / `PredictionReport` | Pydantic | Analysis output models |
-
-### Config (`from bilianalysis.config import`)
-| Export | Kind | Description |
-|--------|------|-------------|
-| `load_config(path?)` | fn | Load YAML → `AppConfig` |
-| `AppConfig` | Pydantic | Root config with 4 sections |
-| `CrawlerSection` / `AnalysisSection` / `DataSection` / `SchedulerConfig` | Pydantic | Section models |
-
-### Scheduler (`from bilianalysis.scheduler import`)
-| Export | Kind | Description |
-|--------|------|-------------|
-| `Task` / `TaskResult` / `TaskContext` | class | Task execution framework |
-| `register` / `get_task` / `list_tasks` | fn | Task registry |
-| `CronService` | class | APScheduler-backed cron runner |
-
-## Tech Stack
-
-- Python >= 3.13, `uv` package manager
-- `aiohttp` — async HTTP; `fake-useragent` — rotating UA
-- `pydantic` — config/report models, progress persistence
-- `pandas` + `scikit-learn` — PandasEngine (KMeans, PCA, LinearRegression)
-- `pyspark` — SparkEngine (Spark MLlib, optional HDFS via `hdfs` library)
-- `pytest` + `pytest-asyncio` — 109 tests, asyncio auto mode
-- `fastapi` + `uvicorn` — API server (app/api/)
-- `sqlalchemy[asyncio]` + `asyncpg` — [planned] PostgreSQL integration
-- Vue3 + Element Plus + ECharts + Alova + TailwindCSS 4 — frontend (app/ui/)
-- `vitest` + `@playwright/test` — frontend tests
-- `mypy` — static type checking
+- **Library/app boundary**: `src/bilianalysis/` is pure Python. Only `app/api/` touches PostgreSQL.
+- **Session-injected HTTP**: `fetch.py` does NOT own the aiohttp session — callers create/inject it.
+- **Task registry**: `@register("name")` decorator. Library tasks in `builtins/`, DB tasks in `app/api/tasks/`.
+- **Keep-alive**: Browse list pages cached in `<keep-alive>` so scroll/filter state survives navigation.
+- **Infinite scroll**: Uses Element Plus `el-scrollbar` + `@end-reached` event (not pagination buttons).
+- **Execution history**: Persisted to `data/run_history.csv` via `app/api/history.py`. Survives restarts.
+- **Scalar types**: All Bilibili ID columns (mid, cid, aid, tid) must be PostgreSQL `BIGINT`, not `INTEGER`.
+- **WBI field names**: Bilibili API uses `stime`/`etime`, not `start_time`/`end_time`.
 
 ## Testing
 
-- `asyncio_mode = "auto"` in `pyproject.toml` — no decorators needed for async tests
-- Mock patterns: `unittest.mock.patch` targets module import paths (e.g., `"bilianalysis.crawler.api.get"`)
+- `asyncio_mode = "auto"` — no decorators needed for async tests
+- Mock patterns: `unittest.mock.patch` targets module import paths (e.g., `"bilianalysis.crawler.pipeline.list_series"`)
 - File I/O tests use `tmp_path` + `monkeypatch.setattr("bilianalysis.crawler.storage.DATA_DIR", tmp_path)`
-- Module-level test constants (`SERIES_LIST`, `WEEKLY_DATA`) shared across test classes
-- Engine tests verify all 4 analysis steps produce valid report models
-- Scheduler tests mock individual tasks and verify pipeline failure modes (stop/skip/retry)
-- After test or before the end, uses `mypy` tool to check code about static type
+- Engine tests verify all 4 analysis steps produce valid Pydantic report models
+- Scheduler tests mock individual tasks and verify failure modes (stop/skip/retry)
+- 143 Python tests + 14 Vitest frontend tests + Playwright e2e scaffold
