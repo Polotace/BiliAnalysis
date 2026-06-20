@@ -5,7 +5,7 @@ import PageShell from '@/components/layout/PageShell.vue'
 import StatCard from '@/components/shared/StatCard.vue'
 import {
   fetchCrawlerStatus, fetchAnalysisOverview, fetchPipelineList,
-  fetchPipelineHistory, triggerPipeline,
+  fetchPipelineHistory, triggerPipeline, triggerTask, fetchTaskList,
 } from '@/composables/useApi'
 import type {
   CrawlerStatus, AnalysisOverview, RunHistoryItem, PipelineInfo,
@@ -18,6 +18,31 @@ const { data: analysisOverview, send: aoSend } =
   useRequest(fetchAnalysisOverview, { immediate: false })
 const { data: pipelineList, send: plSend } =
   useRequest(fetchPipelineList, { immediate: false })
+
+// ── Individual task triggers ──
+const taskNames = ref<string[]>([])
+
+async function loadTaskList() {
+  try {
+    const r = await fetchTaskList()
+    taskNames.value = (r as any)?.tasks ?? []
+  } catch { taskNames.value = [] }
+}
+
+async function doTask(name: string) {
+  actionLoading.value = name
+  actionResult.value = ''
+  actionError.value = ''
+  try {
+    const r = await triggerTask(name)
+    actionResult.value = `✓ 任务 ${name} 已触发 (run_id=${(r as any).run_id ?? 'OK'})`
+    setTimeout(async () => { await Promise.all([csSend(), aoSend()]) }, 1500)
+  } catch (e: any) {
+    actionError.value = `任务 ${name} 失败: ${e.message || e}`
+  } finally {
+    actionLoading.value = ''
+  }
+}
 
 // ── Action state ──
 const actionLoading = ref('')
@@ -45,7 +70,7 @@ const PIPELINE_ICONS: Record<string, string> = {
 
 // ── Load on mount ──
 onMounted(async () => {
-  await Promise.all([csSend(), aoSend(), plSend()])
+  await Promise.all([csSend(), aoSend(), plSend(), loadTaskList()])
   await loadHistory()
 })
 
@@ -158,6 +183,23 @@ function pipelineColor(name: string): string {
     </div>
     <div v-if="actionError" class="mb-3 p-3 rounded-lg bg-[#FEF2F2] text-[#991B1B] text-sm border border-[#FECACA] font-medium">
       {{ actionError }}
+    </div>
+
+    <!-- Individual task triggers -->
+    <h2 class="text-[1.0625rem] font-semibold text-text mb-4">单个任务</h2>
+    <div class="flex flex-wrap gap-2 mb-3">
+      <button
+        v-for="tname in taskNames"
+        :key="tname"
+        @click="doTask(tname)"
+        :disabled="actionLoading !== ''"
+        class="px-4 py-2 rounded-[12px] bg-card text-text-secondary border border-border
+               text-sm font-medium cursor-pointer transition-all duration-150
+               hover:border-blue hover:text-blue disabled:opacity-50"
+      >
+        <span v-if="actionLoading === tname" class="inline-block w-3.5 h-3.5 border-2 border-border border-t-blue rounded-full animate-spin mr-2 align-middle" />
+        {{ tname }}
+      </button>
     </div>
 
     <!-- ── 执行历史 ── -->

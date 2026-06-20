@@ -11,11 +11,23 @@ from bilianalysis.scheduler.runner import PipelineRunner
 from api.deps import get_config, get_runner
 from api.errors import PipelineNotFound
 from api.history import save_record
+from bilianalysis.engine import create_engine
+from bilianalysis.scheduler.registry import get_task
+from bilianalysis.scheduler.task import TaskContext
 from api.schemas import (
     TaskTriggerResponse, PipelineInfo, PipelineListResponse, RunHistoryItem,
 )
 
 router = APIRouter(tags=["tasks"])
+
+
+@router.get("/task")
+async def list_task_names():
+    """List all registered task names."""
+    import bilianalysis.scheduler.builtins  # noqa: F401
+    import app.api.tasks                  # noqa: F401
+    from bilianalysis.scheduler.registry import list_tasks
+    return {"tasks": list_tasks()}
 
 
 @router.get("/tasks", response_model=PipelineListResponse)
@@ -96,3 +108,41 @@ async def pipeline_history(
         if len(items) >= limit:
             break
     return items
+
+
+@router.post("/task/{name}", status_code=202, response_model=TaskTriggerResponse)
+async def run_single_task(
+    name: str,
+    config: Annotated[AppConfig, Depends(get_config)],
+    request: Request,
+):
+    """Run a single registered task independently (not as part of a pipeline)."""
+    import bilianalysis.scheduler.builtins  # noqa: F401
+    import app.api.tasks                  # noqa: F401
+
+    try:
+        task_cls = get_task(name)
+    except KeyError:
+        raise PipelineNotFound(name)
+
+    record = RunRecord(
+        pipeline=f"_task_{name}", trigger="manual",
+        started_at=datetime.now(timezone.utc),
+    )
+    request.app.state.run_history.append(record)
+
+    async def _run():
+        try:
+            ctx = TaskContext(config=config)
+            ctx.engine = create_engine(config)
+            result = await task_cls().run(ctx)
+            record.status = result.status
+            record.step_results = [result]
+        except Exception:
+            record.status = "failed"
+        finally:
+            record.finished_at = datetime.now(timezone.utc)
+            save_record(record)
+
+    asyncio.create_task(_run())
+    return TaskTriggerResponse(run_id=record.run_id, pipeline=f"_task_{name}")
