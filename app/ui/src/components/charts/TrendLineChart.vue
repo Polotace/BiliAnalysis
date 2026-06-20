@@ -26,7 +26,7 @@ const option = computed<EChartsOption>(() => ({
     bottom: 0,
     data: ['平均播放', '平均点赞', '互动率'],
   },
-  grid: { left: 60, right: 60, top: 16, bottom: 48 },
+  grid: { left: 60, right: 80, top: 16, bottom: 48 },
   dataZoom: [
     {
       type: 'slider',
@@ -51,15 +51,7 @@ const option = computed<EChartsOption>(() => ({
       type: 'value',
       name: '播放量',
       axisLabel: {
-        color: '#6B7280', fontSize: 11,
-        formatter: (v: number) => v >= 10000 ? `${(v / 10000).toFixed(0)}万` : String(v),
-      },
-    },
-    {
-      type: 'value',
-      name: '点赞量',
-      axisLabel: {
-        color: '#6B7280', fontSize: 11,
+        color: '#00AEEC', fontSize: 11,
         formatter: (v: number) => v >= 10000 ? `${(v / 10000).toFixed(0)}万` : String(v),
       },
     },
@@ -67,7 +59,7 @@ const option = computed<EChartsOption>(() => ({
       type: 'value',
       name: '互动率',
       axisLabel: {
-        color: '#6B7280', fontSize: 11,
+        color: '#F59E0B', fontSize: 11,
         formatter: (v: number) => `${(v * 100).toFixed(1)}%`,
       },
     },
@@ -82,14 +74,14 @@ const option = computed<EChartsOption>(() => ({
     },
     {
       name: '平均点赞', type: 'line', smooth: false,
-      yAxisIndex: 1,
+      yAxisIndex: 0,
       data: props.weeks.map(w => w.avg_like),
       itemStyle: { color: '#22C55E' },
       symbol: 'none',
     },
     {
       name: '互动率', type: 'line', smooth: false,
-      yAxisIndex: 2,
+      yAxisIndex: 1,
       data: props.weeks.map(w => w.avg_interaction_rate),
       itemStyle: { color: '#F59E0B' },
       symbol: 'none',
