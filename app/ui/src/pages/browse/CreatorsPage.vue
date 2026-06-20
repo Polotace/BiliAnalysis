@@ -52,15 +52,15 @@ onMounted(() => loadPage())
 </script>
 
 <template>
-  <PageShell>
-    <div class="pb-10">
+  <PageShell class="!py-6 h-screen flex flex-col overflow-hidden">
+    <div class="shrink-0 pb-6">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">创作者</h1>
       <p class="text-[0.9375rem] text-text-secondary">
         <span class="tabular font-semibold text-text">{{ total }}</span> 位创作者上榜「每周必看」
       </p>
     </div>
 
-    <div class="pb-6">
+    <div class="shrink-0 pb-4">
       <SortTabs v-model="sortBy" :options="SORT_OPTIONS" @update:model-value="resetAndLoad" />
     </div>
 
@@ -68,13 +68,13 @@ onMounted(() => loadPage())
       <div v-for="i in 6" :key="i" class="h-20 bg-card rounded-[12px] animate-pulse" />
     </div>
 
-    <div v-else-if="!loading && creators.length === 0 && !hasMore" class="py-24 text-center">
+    <div v-else-if="!loading && creators.length === 0 && !hasMore" class="flex-1 flex items-center justify-center">
       <p class="text-text-secondary">暂无创作者数据</p>
     </div>
 
     <template v-else>
-      <el-scrollbar height="calc(100vh - 230px)" @end-reached="loadMore">
-        <div class="grid grid-cols-3 gap-4 pb-8">
+      <el-scrollbar class="flex-1" @end-reached="loadMore">
+        <div class="grid grid-cols-3 gap-4 pb-4">
           <CreatorCard v-for="c in creators" :key="c.mid" :creator="c" />
         </div>
         <div class="flex items-center justify-center py-6 gap-2 text-sm text-text-secondary">

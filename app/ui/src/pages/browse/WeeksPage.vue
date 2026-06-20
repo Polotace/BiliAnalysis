@@ -30,8 +30,8 @@ async function loadMore() {
 </script>
 
 <template>
-  <PageShell>
-    <div class="pb-10">
+  <PageShell class="!py-6 h-screen flex flex-col overflow-hidden">
+    <div class="shrink-0 pb-6">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">每周必看</h1>
       <p class="text-[0.9375rem] text-text-secondary">
         从 2019 年至今，已收录 <span class="tabular font-semibold text-text">{{ weeks.length }}</span> 期周报
@@ -42,19 +42,21 @@ async function loadMore() {
       <div v-for="i in 4" :key="i" class="h-[280px] bg-card rounded-[16px] animate-pulse" />
     </div>
 
-    <div v-else-if="error" class="py-24 text-center">
-      <p class="text-lg font-semibold text-text mb-2">加载失败</p>
-      <p class="text-sm text-text-secondary mb-6">{{ (error as Error).message }}</p>
-      <button @click="send()" class="px-6 py-2 bg-blue text-white rounded-[12px] font-medium hover:opacity-90">重试</button>
+    <div v-else-if="error" class="flex-1 flex items-center justify-center">
+      <div class="text-center">
+        <p class="text-lg font-semibold text-text mb-2">加载失败</p>
+        <p class="text-sm text-text-secondary mb-6">{{ (error as Error).message }}</p>
+        <button @click="send()" class="px-6 py-2 bg-blue text-white rounded-[12px] font-medium hover:opacity-90">重试</button>
+      </div>
     </div>
 
-    <div v-else-if="weeks.length === 0" class="py-24 text-center">
+    <div v-else-if="weeks.length === 0" class="flex-1 flex items-center justify-center">
       <p class="text-text-secondary">暂无周报数据</p>
     </div>
 
     <template v-else>
-      <el-scrollbar height="calc(100vh - 200px)" @end-reached="loadMore">
-        <div class="grid grid-cols-2 gap-6 pb-8">
+      <el-scrollbar class="flex-1" @end-reached="loadMore">
+        <div class="grid grid-cols-2 gap-6 pb-4">
           <WeekCard v-for="w in displayed" :key="w.number" :week="w" />
         </div>
         <div class="flex items-center justify-center py-6 gap-2 text-sm text-text-secondary">

@@ -65,30 +65,30 @@ onMounted(() => loadPage())
 </script>
 
 <template>
-  <PageShell>
-    <div class="pb-10">
+  <PageShell class="!py-6 h-screen flex flex-col overflow-hidden">
+    <div class="shrink-0 pb-6">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">发现好内容</h1>
       <p class="text-[0.9375rem] text-text-secondary">
         浏览 B站「每周必看」的 <span class="tabular font-semibold text-text">{{ total }}</span> 个精选视频
       </p>
     </div>
 
-    <div class="flex items-center gap-3 pb-6 flex-wrap">
+    <div class="shrink-0 flex items-center gap-3 pb-4 flex-wrap">
       <SearchBar v-model="search" placeholder="搜索视频标题…" @update:model-value="resetAndLoad" />
       <SortTabs v-model="sortBy" :options="SORT_OPTIONS" @update:model-value="resetAndLoad" />
     </div>
 
     <div v-if="loading && videos.length === 0" class="grid grid-cols-3 gap-5 pb-8">
-      <div v-for="i in 6" :key="i" class="h-[320px] bg-card rounded-[12px] animate-pulse" />
+      <div v-for="i in 6" :key="i" class="h-80 bg-card rounded-[12px] animate-pulse" />
     </div>
 
-    <div v-else-if="!loading && videos.length === 0 && !hasMore" class="py-24 text-center">
+    <div v-else-if="!loading && videos.length === 0 && !hasMore" class="flex-1 flex items-center justify-center">
       <p class="text-text-secondary">暂无视频数据</p>
     </div>
 
     <template v-else>
-      <el-scrollbar height="calc(100vh - 200px)" @end-reached="loadMore">
-        <div class="grid grid-cols-3 gap-5 pb-8">
+      <el-scrollbar class="flex-1" @end-reached="loadMore">
+        <div class="grid grid-cols-3 gap-5 pb-4">
           <VideoCard v-for="v in videos" :key="v.aid" :video="v" />
         </div>
         <div class="flex items-center justify-center py-6 gap-2 text-sm text-text-secondary">
