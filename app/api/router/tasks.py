@@ -25,7 +25,7 @@ router = APIRouter(tags=["tasks"])
 async def list_task_names():
     """List all registered task names."""
     import bilianalysis.scheduler.builtins  # noqa: F401
-    import app.api.tasks                  # noqa: F401
+    import api.tasks                  # noqa: F401
     from bilianalysis.scheduler.registry import list_tasks
     return {"tasks": list_tasks()}
 
@@ -78,6 +78,30 @@ async def trigger_pipeline(
     return TaskTriggerResponse(run_id=record.run_id, pipeline=name)
 
 
+@router.get("/tasks/history", response_model=list[RunHistoryItem])
+async def all_history(
+    config: Annotated[AppConfig, Depends(get_config)],
+    request: Request,
+    limit: int = 50,
+):
+    """Get all execution history from CSV, newest first."""
+    from api.history import load_records
+    rows = load_records()
+    items = []
+    for row in rows[:limit]:
+        items.append(RunHistoryItem(
+            run_id=row["run_id"],
+            pipeline=row["pipeline"],
+            trigger=row.get("trigger", "manual"),
+            started_at=row.get("started_at", ""),
+            finished_at=row.get("finished_at") or None,
+            status=row.get("status", "unknown"),
+            step_count=int(row.get("step_count", 0)),
+            failed_step=row.get("failed_step") or None,
+        ))
+    return items
+
+
 @router.get("/tasks/{name}/history", response_model=list[RunHistoryItem])
 async def pipeline_history(
     name: str,
@@ -118,7 +142,7 @@ async def run_single_task(
 ):
     """Run a single registered task independently (not as part of a pipeline)."""
     import bilianalysis.scheduler.builtins  # noqa: F401
-    import app.api.tasks                  # noqa: F401
+    import api.tasks                  # noqa: F401
 
     try:
         task_cls = get_task(name)

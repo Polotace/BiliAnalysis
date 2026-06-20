@@ -6,6 +6,7 @@ import StatCard from '@/components/shared/StatCard.vue'
 import {
   fetchCrawlerStatus, fetchAnalysisOverview, fetchPipelineList,
   fetchPipelineHistory, triggerPipeline, triggerTask, fetchTaskList,
+  fetchAllHistory,
 } from '@/composables/useApi'
 import type {
   CrawlerStatus, AnalysisOverview, RunHistoryItem, PipelineInfo,
@@ -52,7 +53,7 @@ const actionError = ref('')
 // ── History ──
 const history = ref<RunHistoryItem[]>([])
 const historyLoading = ref(false)
-const historyPipeline = ref('crawl')
+const historyPipeline = ref('all')
 
 // ── Pipeline colors ──
 const PIPELINE_COLORS: Record<string, string> = {
@@ -92,8 +93,13 @@ async function doAction(pl: PipelineInfo) {
 async function loadHistory() {
   historyLoading.value = true
   try {
-    const r = await fetchPipelineHistory(historyPipeline.value, 30)
-    history.value = r ?? []
+    if (historyPipeline.value === 'all') {
+      const r = await fetchAllHistory(50)
+      history.value = r ?? []
+    } else {
+      const r = await fetchPipelineHistory(historyPipeline.value, 30)
+      history.value = r ?? []
+    }
   } catch { history.value = [] }
   finally { historyLoading.value = false }
 }
@@ -106,9 +112,6 @@ function switchHistory(name: string) {
 function fmtTime(ts: string | null): string {
   if (!ts) return '—'
   return new Date(ts).toLocaleString('zh-CN')
-}
-function statusClass(s: string): string {
-  return s === 'success' ? 'text-success' : s === 'running' ? 'text-warning' : 'text-danger'
 }
 function pipelineColor(name: string): string {
   return PIPELINE_COLORS[name] ?? 'bg-text-secondary'
@@ -205,6 +208,13 @@ function pipelineColor(name: string): string {
     <!-- ── 执行历史 ── -->
     <h2 class="text-[1.0625rem] font-semibold text-text mb-4">执行历史</h2>
     <div class="flex gap-2 mb-4 flex-wrap">
+      <button
+        @click="switchHistory('all')"
+        class="px-4 py-1.5 border rounded-[20px] text-sm font-medium transition-colors cursor-pointer"
+        :class="historyPipeline === 'all'
+          ? 'bg-blue text-white border-blue'
+          : 'bg-card text-text-secondary border-border hover:border-blue hover:text-blue'"
+      >全部</button>
       <template v-if="pipelineList">
         <button
           v-for="pl in pipelineList.pipelines"
@@ -227,6 +237,7 @@ function pipelineColor(name: string): string {
         <thead>
           <tr class="border-b border-border text-text-secondary">
             <th class="text-left p-3 font-medium">时间</th>
+            <th class="text-left p-3 font-medium">流水线</th>
             <th class="text-left p-3 font-medium">触发</th>
             <th class="text-left p-3 font-medium">状态</th>
             <th class="text-left p-3 font-medium">步骤</th>
@@ -235,13 +246,23 @@ function pipelineColor(name: string): string {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="h in history" :key="h.run_id" class="border-b border-border last:border-0">
-            <td class="p-3 tabular text-text-secondary">{{ fmtTime(h.started_at) }}</td>
-            <td class="p-3">{{ h.trigger }}</td>
-            <td class="p-3 tabular" :class="statusClass(h.status)">{{ h.status }}</td>
-            <td class="p-3 tabular">{{ h.step_count }}</td>
-            <td class="p-3 text-text-secondary">{{ h.failed_step || '—' }}</td>
-            <td class="p-3 tabular text-text-secondary">
+          <tr v-for="h in history" :key="h.run_id" class="border-b border-border last:border-0 hover:bg-bg/50">
+            <td class="p-3 tabular text-text-secondary text-xs">{{ fmtTime(h.started_at) }}</td>
+            <td class="p-3">
+              <span class="text-xs px-2 py-0.5 rounded font-medium bg-border/50 text-text-secondary">{{ h.pipeline }}</span>
+            </td>
+            <td class="p-3 text-xs text-text-secondary">{{ h.trigger }}</td>
+            <td class="p-3">
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium"
+                :class="h.status === 'success' ? 'bg-[#ECFDF5] text-[#166534]'
+                     : h.status === 'failed' ? 'bg-[#FEF2F2] text-[#991B1B]'
+                     : h.status === 'running' ? 'bg-[#FEF3C7] text-[#92400E]'
+                     : 'bg-[#F3F4F6] text-text-secondary'"
+              >{{ h.status }}</span>
+            </td>
+            <td class="p-3 tabular text-xs">{{ h.step_count }}</td>
+            <td class="p-3 text-xs text-text-secondary">{{ h.failed_step || '—' }}</td>
+            <td class="p-3 tabular text-xs text-text-secondary">
               {{ h.finished_at
                   ? ((new Date(h.finished_at).getTime() - new Date(h.started_at).getTime()) / 1000).toFixed(0) + 's'
                   : '—' }}

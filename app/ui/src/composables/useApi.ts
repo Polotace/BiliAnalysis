@@ -167,6 +167,9 @@ export function fetchTaskList() {
 export function fetchPipelineHistory(name: string, limit: number = 20) {
   return alova.Get<RunHistoryItem[]>(`/tasks/${name}/history`, { params: { limit } })
 }
+export function fetchAllHistory(limit: number = 50) {
+  return alova.Get<RunHistoryItem[]>('/tasks/history', { params: { limit } })
+}
 export function fetchAppConfig() {
   return alova.Get<AppConfigData>('/config')
 }

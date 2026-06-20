@@ -105,7 +105,7 @@ def run_task_cmd(
     from bilianalysis.engine import create_engine
 
     import bilianalysis.scheduler.builtins  # noqa: F401
-    import app.api.tasks                  # noqa: F401
+    import api.tasks                  # noqa: F401
 
     config = load_config(config_path)
     try:
