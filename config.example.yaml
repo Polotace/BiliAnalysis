@@ -35,13 +35,19 @@ scheduler:
       steps: [clean_data, statistics, clustering, prediction]
       step_failure: stop
 
+    # 数据入库流水线：手动触发
+    db_load:
+      schedule: ""
+      steps: [db_load]
+      step_failure: stop
+
     # Warehouse 构建流水线：手动触发
     warehouse:
       schedule: ""
       steps: [build_warehouse]
       step_failure: stop
 
-    # 完整流水线：手动触发（爬取 + 分析 + Warehouse 一站式）
+    # 完整流水线：手动触发（爬取 + 分析 + 入库 + Warehouse 一站式）
     full:
       schedule: ""
       steps: [crawl, clean_data, statistics, clustering, prediction, build_warehouse]
