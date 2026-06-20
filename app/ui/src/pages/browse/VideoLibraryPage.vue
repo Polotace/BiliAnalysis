@@ -65,7 +65,7 @@ onMounted(() => loadPage())
 </script>
 
 <template>
-  <PageShell class="!py-6 h-full flex flex-col">
+  <PageShell class="flex flex-col h-full">
     <div class="shrink-0 pb-6">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">发现好内容</h1>
       <p class="text-[0.9375rem] text-text-secondary">

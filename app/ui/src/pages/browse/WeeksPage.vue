@@ -30,7 +30,7 @@ async function loadMore() {
 </script>
 
 <template>
-  <PageShell class="!py-6 h-full flex flex-col">
+  <PageShell class="flex flex-col h-full">
     <div class="shrink-0 pb-6">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">每周必看</h1>
       <p class="text-[0.9375rem] text-text-secondary">
