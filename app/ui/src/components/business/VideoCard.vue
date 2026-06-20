@@ -2,17 +2,23 @@
 import type { VideoSummary } from '@/types/api'
 import { proxyImage } from '@/composables/useImageProxy'
 
-defineProps<{ video: VideoSummary }>()
+const props = defineProps<{ video: VideoSummary }>()
 
 function fmt(n: number): string {
   return n >= 10000 ? `${(n / 10000).toFixed(1)}万` : String(n)
+}
+
+function openBili() {
+  if (props.video.bvid) {
+    window.open(`https://www.bilibili.com/video/${props.video.bvid}`, '_blank')
+  }
 }
 </script>
 
 <template>
   <router-link
     :to="`/videos/${video.aid}`"
-    class="block bg-card rounded-[12px] shadow-[var(--shadow-default)] overflow-hidden
+    class="group block bg-card rounded-[12px] shadow-[var(--shadow-default)] overflow-hidden
            transition-shadow duration-200 hover:shadow-[var(--shadow-hover)] hover:-translate-y-0.5
            cursor-pointer no-underline"
   >
@@ -27,6 +33,20 @@ function fmt(n: number): string {
       <div v-else class="w-full h-full flex items-center justify-center text-text-secondary text-sm">
         暂无封面
       </div>
+      <!-- B站跳转按钮 -->
+      <span
+        v-if="video.bvid"
+        @click.stop="openBili"
+        class="absolute top-2 right-2 bg-white/90 hover:bg-white text-blue text-xs
+               w-6 h-6 rounded-full flex items-center justify-center cursor-pointer
+               opacity-0 group-hover:opacity-100 transition-opacity duration-150
+               shadow-sm"
+        title="在B站观看"
+      >
+        <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M11.176 14.717a.527.527 0 0 1-.533.531h-2.128a.533.533 0 0 1-.533-.531V9.24c0-.295.24-.533.533-.533h2.128c.295 0 .533.24.533.533v5.477zm3.062-3.527-1.645 3.43a.535.535 0 0 1-.484.301.5.5 0 0 1-.195-.038.53.53 0 0 1-.297-.68l1.676-3.466-1.659-3.466a.533.533 0 0 1 .969-.428l1.635 3.435a.6.6 0 0 1 0 .48v.432zM2 5.006C2 3.346 3.346 2 5.006 2h13.988C20.654 2 22 3.346 22 5.006v13.988A3.006 3.006 0 0 1 18.994 22H5.006A3.006 3.006 0 0 1 2 18.994V5.006zM5.006 4h13.988C19.55 4 20 4.45 20 5.006v13.988c0 .557-.45 1.006-1.006 1.006H5.006C4.45 20 4 19.55 4 18.994V5.006C4 4.45 4.45 4 5.006 4z" fill-rule="evenodd"/>
+        </svg>
+      </span>
       <span
         v-if="video.duration"
         class="absolute bottom-2 right-2 bg-black/75 text-white text-xs px-1.5 py-0.5 rounded tabular"
