@@ -37,37 +37,41 @@ const option = computed<EChartsOption>(() => {
     }
   }
 
-  const series = CLUSTER_COLORS.map((color, i) => ({
-    name: props.clusters[i]?.tag ?? `Cluster ${i}`,
-    type: 'scatter' as const,
-    data: pointsByCluster[i],
-    itemStyle: { color, opacity: 0.6 },
-    symbolSize: 4,
-  }))
-
-  series.push({
-    name: '簇中心',
-    type: 'scatter' as const,
-    data: props.clusters.map(c => [c.centroid.view ?? c.centroid.x, c.centroid.like ?? c.centroid.y]),
-    itemStyle: { color: '#EF4444' },
-    symbol: 'diamond',
-    symbolSize: 14,
-  } as any)
+  const series = CLUSTER_COLORS.map((color, i) => {
+    const cluster = props.clusters[i]
+    const name = cluster
+      ? `${cluster.tag} (${cluster.count})`
+      : `Cluster ${i}`
+    return {
+      name,
+      type: 'scatter' as const,
+      data: pointsByCluster[i],
+      itemStyle: { color, opacity: 0.5 },
+      symbolSize: 3,
+    }
+  })
 
   return {
     animation: false,
     tooltip: {
       trigger: 'item',
       formatter: (params: any) => {
-        if (params.seriesIndex >= CLUSTER_COLORS.length) return `簇中心`
         const tag = props.clusters[params.seriesIndex]?.tag ?? `Cluster ${params.seriesIndex}`
-        return `${tag}<br/>x: ${params.value[0]?.toFixed(2)}<br/>y: ${params.value[1]?.toFixed(2)}`
+        return `${tag}<br/>PC1: ${params.value[0]?.toFixed(2)}<br/>PC2: ${params.value[1]?.toFixed(2)}`
       },
     },
     legend: { bottom: 0 },
     grid: { left: 48, right: 16, top: 16, bottom: 40 },
-    xAxis: { type: 'value', name: 'PCA 维度1', axisLabel: { color: '#6B7280', fontSize: 11 } },
-    yAxis: { type: 'value', name: 'PCA 维度2', axisLabel: { color: '#6B7280', fontSize: 11 } },
+    xAxis: {
+      type: 'value', name: 'PC1',
+      axisLabel: { color: '#6B7280', fontSize: 11 },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value', name: 'PC2',
+      axisLabel: { color: '#6B7280', fontSize: 11 },
+      splitLine: { show: false },
+    },
     series,
   }
 })
