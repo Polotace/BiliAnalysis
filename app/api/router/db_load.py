@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from bilianalysis.config.model import AppConfig
 from api.db.loader import load_incremental, load_raw_weeks
-from api.deps import get_config, get_db
+from api.deps import get_config, get_db, require_admin
 
 router = APIRouter(tags=["database"])
 
@@ -15,6 +15,7 @@ router = APIRouter(tags=["database"])
 async def load_to_db(
     config: Annotated[AppConfig, Depends(get_config)],
     session: Annotated[AsyncSession, Depends(get_db)],
+    _admin: None = Depends(require_admin),
 ):
     """Load raw week data from data/raw/ into PostgreSQL.
 

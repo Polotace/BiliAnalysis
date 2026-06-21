@@ -8,7 +8,7 @@ from fastapi import APIRouter, Request, Depends
 from bilianalysis.config.model import AppConfig
 from bilianalysis.scheduler.models import RunRecord
 from bilianalysis.scheduler.runner import PipelineRunner
-from api.deps import get_config, get_runner
+from api.deps import get_config, get_runner, require_admin
 from api.errors import PipelineNotFound
 from api.history import save_record
 from bilianalysis.engine import create_engine
@@ -51,6 +51,7 @@ async def trigger_pipeline(
     config: Annotated[AppConfig, Depends(get_config)],
     runner: Annotated[PipelineRunner, Depends(get_runner)],
     request: Request,
+    _admin: None = Depends(require_admin),
 ):
     """Trigger a named pipeline in the background."""
     if name not in config.scheduler.pipelines:
@@ -139,6 +140,7 @@ async def run_single_task(
     name: str,
     config: Annotated[AppConfig, Depends(get_config)],
     request: Request,
+    _admin: None = Depends(require_admin),
 ):
     """Run a single registered task independently (not as part of a pipeline)."""
     import bilianalysis.scheduler.builtins  # noqa: F401

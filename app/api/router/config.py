@@ -5,7 +5,7 @@ import yaml
 from fastapi import APIRouter, Request, Depends, HTTPException
 
 from bilianalysis.config.model import AppConfig
-from api.deps import get_config
+from api.deps import get_config, require_admin
 from api.schemas import ConfigUpdateRequest
 
 router = APIRouter(tags=["config"])
@@ -32,6 +32,7 @@ async def update_config(
     body: ConfigUpdateRequest,
     config: Annotated[AppConfig, Depends(get_config)],
     request: Request,
+    _admin: None = Depends(require_admin),
 ):
     """Update runtime configuration, optionally persisting to config.yaml."""
     section_attr = body.section

@@ -10,10 +10,11 @@ from bilianalysis.config.model import AppConfig
 from bilianalysis.nlp import KeywordsReport as NLPKeywordsReport
 from bilianalysis.engine.base import (
     AnalysisEngine, StatReport, ClusterReport, PredictionReport,
+    ModelComparisonReport,
 )
 from bilianalysis.scheduler.models import RunRecord
 from bilianalysis.scheduler.runner import PipelineRunner
-from api.deps import get_config, get_runner, get_engine
+from api.deps import get_config, get_runner, get_engine, require_admin
 from api.history import save_record
 from api.schemas import TaskTriggerResponse, AnalysisOverview
 
@@ -50,6 +51,7 @@ async def trigger_analysis(
     config: Annotated[AppConfig, Depends(get_config)],
     runner: Annotated[PipelineRunner, Depends(get_runner)],
     request: Request,
+    _admin: None = Depends(require_admin),
 ):
     """Trigger a full analysis pipeline (clean -> stats -> cluster -> predict)."""
     from datetime import datetime, timezone
@@ -85,6 +87,7 @@ async def get_analysis_overview(config: Annotated[AppConfig, Depends(get_config)
         last_stats=_read_json(rd / "stats_report.json"),
         last_cluster=_read_json(rd / "cluster_report.json"),
         last_prediction=_read_json(rd / "prediction_report.json"),
+        last_model_comparison=_read_json(rd / "model_comparison_report.json"),
     )
 
 
@@ -156,3 +159,31 @@ async def get_keywords(config: Annotated[AppConfig, Depends(get_config)]):
         status_code=503,
         detail="关键词报告尚未生成，请先触发 analysis 流水线",
     )
+
+
+@router.get("/analysis/models", response_model=ModelComparisonReport)
+async def get_model_comparison(
+    config: Annotated[AppConfig, Depends(get_config)],
+    engine: Annotated[AnalysisEngine, Depends(get_engine)],
+):
+    """Get model comparison report.
+
+    Reads from cached report JSON if available (sub-ms); falls back to
+    live engine computation (~60-90s for 5 models with 5-fold CV).
+    """
+    cached = _read_json(_reports_dir(config) / "model_comparison_report.json")
+    if cached:
+        return ModelComparisonReport(**cached)
+    _check_data_ready(config)
+    try:
+        return engine.model_comparison()
+    except (FileNotFoundError, OSError):
+        raise HTTPException(
+            status_code=503,
+            detail="暂无数据，请先触发一次数据采集与分析",
+        )
+    except NotImplementedError:
+        raise HTTPException(
+            status_code=503,
+            detail="当前分析引擎不支持模型对比 (需要 Pandas 引擎)",
+        )
