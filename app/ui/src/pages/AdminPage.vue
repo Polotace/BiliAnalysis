@@ -50,6 +50,23 @@ const actionLoading = ref('')
 const actionResult = ref('')
 const actionError = ref('')
 
+// ── API Key ──
+const apiKeyInput = ref('')
+const apiKeySaved = ref(!!localStorage.getItem("admin_api_key"))
+
+function saveApiKey() {
+  if (apiKeyInput.value.trim()) {
+    localStorage.setItem("admin_api_key", apiKeyInput.value.trim())
+    apiKeySaved.value = true
+    apiKeyInput.value = ''
+  }
+}
+
+function clearApiKey() {
+  localStorage.removeItem("admin_api_key")
+  apiKeySaved.value = false
+}
+
 // ── History ──
 const history = ref<RunHistoryItem[]>([])
 const historyLoading = ref(false)
@@ -125,6 +142,47 @@ function pipelineColor(name: string): string {
       <p class="text-[0.9375rem] text-text-secondary">数据采集、分析与入库管理</p>
     </div>
 
+    <!-- ── API Key 配置 ── -->
+    <div class="mb-6 p-4 rounded-[12px] border flex items-center gap-3 flex-wrap"
+         :class="apiKeySaved
+           ? 'bg-[#ECFDF5] border-[#A7F3D0]'
+           : 'bg-[#E6F7FD] border-[#7DD3FC]'">
+      <span class="text-sm font-semibold shrink-0"
+            :class="apiKeySaved ? 'text-[#166534]' : 'text-[#0369A1]'">
+        🔑 API Key
+      </span>
+      <template v-if="apiKeySaved">
+        <span class="text-sm text-[#166534] font-medium">已配置</span>
+        <span class="inline-block w-2 h-2 rounded-full bg-[#22C55E]" />
+        <button
+          @click="clearApiKey"
+          class="ml-auto px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer
+                 bg-white/60 text-[#991B1B] hover:bg-[#FEF2F2] transition-colors"
+        >
+          清除
+        </button>
+      </template>
+      <template v-else>
+        <input
+          v-model="apiKeyInput"
+          type="password"
+          placeholder="粘贴 API Key…"
+          class="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-[#7DD3FC] bg-white
+                 text-sm outline-none focus:ring-2 focus:ring-blue/30 transition-shadow"
+          @keyup.enter="saveApiKey"
+        />
+        <button
+          @click="saveApiKey"
+          :disabled="!apiKeyInput.trim()"
+          class="px-4 py-2 rounded-lg text-sm font-semibold border-none cursor-pointer
+                 bg-blue text-white hover:brightness-90 transition-all
+                 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          保存
+        </button>
+      </template>
+    </div>
+
     <!-- ── 系统状态 ── -->
     <h2 class="text-[1.0625rem] font-semibold text-text mb-4">系统状态</h2>
 
@@ -168,7 +226,8 @@ function pipelineColor(name: string): string {
           v-for="pl in pipelineList.pipelines"
           :key="pl.name"
           @click="doAction(pl)"
-          :disabled="actionLoading !== ''"
+          :disabled="actionLoading !== '' || !apiKeySaved"
+          :title="!apiKeySaved ? '请先配置 API Key' : ''"
           class="px-5 py-3 rounded-[12px] text-white font-semibold text-sm border-none cursor-pointer
                  transition-opacity duration-200 hover:opacity-85 disabled:opacity-50 text-left"
           :class="pipelineColor(pl.name)"
@@ -195,7 +254,8 @@ function pipelineColor(name: string): string {
         v-for="tname in taskNames"
         :key="tname"
         @click="doTask(tname)"
-        :disabled="actionLoading !== ''"
+        :disabled="actionLoading !== '' || !apiKeySaved"
+        :title="!apiKeySaved ? '请先配置 API Key' : ''"
         class="px-4 py-2 rounded-[12px] bg-card text-text-secondary border border-border
                text-sm font-medium cursor-pointer transition-all duration-150
                hover:border-blue hover:text-blue disabled:opacity-50"
