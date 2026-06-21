@@ -34,10 +34,19 @@ def create_app(config: AppConfig) -> FastAPI:
                 await conn.run_sync(Base.metadata.create_all)
         yield
 
+    # Init API settings — auto-generate admin key if not configured
+    from api.config import ApiSettings
+    import secrets
+    api_settings = ApiSettings()
+    if not api_settings.admin_api_key:
+        api_settings.admin_api_key = secrets.token_urlsafe(32)
+        print(f"[admin] Auto-generated API key: {api_settings.admin_api_key}")
+
     app = FastAPI(title="BiliAnalysis API", version="0.1.0", lifespan=_lifespan)
 
     # Runtime shared state
     app.state.config = config
+    app.state.api_settings = api_settings
     app.state.run_history: deque[RunRecord] = deque(maxlen=200)
 
     # CORS (frontend dev)
