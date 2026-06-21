@@ -10,13 +10,19 @@ import type {
   CategorySummary,
   CrawlerStatus, TaskTriggerResponse, PipelineListResponse,
   RunHistoryItem, AnalysisOverview, AppConfigData,
-  KeywordsReport,
+  KeywordsReport, ModelComparisonReport,
 } from '@/types/api'
 
 const alova = createAlova({
   baseURL: '/api',
   statesHook: vueHook,
   requestAdapter: adapterFetch(),
+  beforeRequest: (method) => {
+    const key = localStorage.getItem("admin_api_key")
+    if (key && method.type !== 'GET') {
+      method.config.headers = { ...method.config.headers, 'X-API-Key': key }
+    }
+  },
   responded: {
     onSuccess: async (response) => {
       if (!response.ok) {
@@ -133,6 +139,16 @@ export function fetchKeywords() {
 
 export function useKeywords() {
   return useRequest(fetchKeywords, { immediate: false })
+}
+
+// ── Model Comparison ──
+
+export function fetchModelComparison() {
+  return alova.Get<ModelComparisonReport>('/analysis/models')
+}
+
+export function useModelComparison() {
+  return useRequest(fetchModelComparison, { immediate: false })
 }
 
 // ── Admin ──
