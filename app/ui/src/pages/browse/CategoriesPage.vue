@@ -18,7 +18,7 @@ const COLORS = [
 <template>
   
     <Sidebar />
-    <PageShell class="flex-1 min-w-0">
+    <PageShell sidebar class="flex-1 min-w-0">
     <div class="pb-10">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">内容分区</h1>
       <p class="text-[0.9375rem] text-text-secondary">

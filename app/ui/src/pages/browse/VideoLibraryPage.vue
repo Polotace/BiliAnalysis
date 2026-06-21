@@ -108,7 +108,7 @@ watch(() => route.query.category_tid, (newVal) => {
 <template>
   
     <Sidebar />
-    <PageShell class="!py-4 h-full flex flex-col">
+    <PageShell sidebar class="!py-4 h-full flex flex-col">
     <div class="shrink-0 pb-6">
       <h1 class="text-[1.75rem] font-bold tracking-[-0.02em] text-text mb-1">发现好内容</h1>
       <p class="text-[0.9375rem] text-text-secondary">

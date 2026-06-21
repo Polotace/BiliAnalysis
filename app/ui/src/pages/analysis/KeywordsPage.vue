@@ -6,6 +6,7 @@ import Sidebar from '@/components/layout/Sidebar.vue'
 import SubNavTabs from '@/components/analysis/SubNavTabs.vue'
 import SectionHeader from '@/components/shared/SectionHeader.vue'
 import KeywordCloud from '@/components/charts/KeywordCloud.vue'
+import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
 
 const { data, loading, error, send } = useKeywords()
 
@@ -17,12 +18,11 @@ const selectedCategory = ref<string | null>(null)
 
 <template>
   <Sidebar />
-  <PageShell>
+  <PageShell sidebar>
     <SubNavTabs class="lg:hidden" />
 
-    <div v-if="loading" class="space-y-8">
-      <div class="h-[400px] bg-card rounded-[12px] animate-pulse" />
-      <div class="h-[400px] bg-card rounded-[12px] animate-pulse" />
+    <div v-if="loading">
+      <AnalysisLoading label="正在提取关键词…" />
     </div>
 
     <div v-else-if="error" class="py-24 text-center">

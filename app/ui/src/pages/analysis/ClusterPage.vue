@@ -9,6 +9,7 @@ import SectionHeader from '@/components/shared/SectionHeader.vue'
 import ClusterCards from '@/components/analysis/ClusterCards.vue'
 import FeatureImportance from '@/components/analysis/FeatureImportance.vue'
 import ClusterScatter from '@/components/charts/ClusterScatter.vue'
+import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
 
 const { data, loading, error, send } = useClusters()
 
@@ -17,15 +18,11 @@ onMounted(() => send())
 
 <template>
     <Sidebar />
-    <PageShell class="flex-1 min-w-0">
+    <PageShell sidebar class="flex-1 min-w-0">
     <SubNavTabs class="lg:hidden" />
 
     <template v-if="loading">
-      <div class="space-y-8">
-        <div class="h-24 bg-card rounded-[12px] animate-pulse" />
-        <div class="h-64 bg-card rounded-[12px] animate-pulse" />
-        <div class="h-[480px] bg-card rounded-[12px] animate-pulse" />
-      </div>
+      <AnalysisLoading label="正在运行聚类算法…" />
     </template>
 
     <div v-else-if="error" class="py-12 text-center">

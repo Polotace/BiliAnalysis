@@ -8,6 +8,7 @@ import StatCard from '@/components/shared/StatCard.vue'
 import SectionHeader from '@/components/shared/SectionHeader.vue'
 import ForecastCards from '@/components/analysis/ForecastCards.vue'
 import FitLineChart from '@/components/charts/FitLineChart.vue'
+import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
 
 const { data, loading, error, send } = usePredictions()
 
@@ -20,16 +21,11 @@ function fmtR2(v: number): string {
 
 <template>
     <Sidebar />
-    <PageShell class="flex-1 min-w-0">
+    <PageShell sidebar class="flex-1 min-w-0">
     <SubNavTabs class="lg:hidden" />
 
     <template v-if="loading">
-      <div class="space-y-8">
-        <div class="h-24 bg-card rounded-[12px] animate-pulse" />
-        <div class="h-64 bg-card rounded-[12px] animate-pulse" />
-        <div class="h-48 bg-card rounded-[12px] animate-pulse" />
-        <div class="h-[400px] bg-card rounded-[12px] animate-pulse" />
-      </div>
+      <AnalysisLoading label="正在训练预测模型…" />
     </template>
 
     <div v-else-if="error" class="py-12 text-center">

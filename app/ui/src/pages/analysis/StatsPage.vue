@@ -9,6 +9,7 @@ import SectionHeader from '@/components/shared/SectionHeader.vue'
 import TrendLineChart from '@/components/charts/TrendLineChart.vue'
 import CategoryPanel from '@/components/analysis/CategoryPanel.vue'
 import CreatorTable from '@/components/analysis/CreatorTable.vue'
+import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
 
 const { data, loading, error, send } = useStats()
 
@@ -18,16 +19,11 @@ onMounted(() => send())
 <template>
   
     <Sidebar />
-    <PageShell class="flex-1 min-w-0">
+    <PageShell sidebar class="flex-1 min-w-0">
     <SubNavTabs class="lg:hidden" />
 
     <template v-if="loading">
-      <div class="space-y-8">
-        <div class="h-24 bg-card rounded-[12px] animate-pulse" />
-        <div class="h-100 bg-card rounded-[12px] animate-pulse" />
-        <div class="h-80 bg-card rounded-[12px] animate-pulse" />
-        <div class="h-64 bg-card rounded-[12px] animate-pulse" />
-      </div>
+      <AnalysisLoading label="正在计算统计数据…" />
     </template>
 
     <div v-else-if="error" class="py-12 text-center">
