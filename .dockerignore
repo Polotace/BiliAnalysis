@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+.git/
+.pytest_cache/
+.mypy_cache/
+.codegraph/
+.superpowers/
+app/ui/node_modules/
+app/ui/src/
+app/ui/e2e/
+design-demos/
+data/
+*.md
+docs/
