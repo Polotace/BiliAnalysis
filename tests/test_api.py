@@ -13,6 +13,16 @@ def client():
     return TestClient(app)
 
 
+@pytest.fixture
+def auth_client():
+    """A TestClient with admin_api_key configured and X-API-Key header set."""
+    config = AppConfig()
+    app = create_app(config)
+    client = TestClient(app)
+    client.headers["X-API-Key"] = app.state.api_settings.admin_api_key
+    return client
+
+
 class TestHealthAndConfig:
     def test_config_get(self, client):
         resp = client.get("/api/config")
@@ -23,8 +33,8 @@ class TestHealthAndConfig:
         assert "data" in data
         assert "scheduler" in data
 
-    def test_config_put_valid(self, client):
-        resp = client.put("/api/config", json={
+    def test_config_put_valid(self, auth_client):
+        resp = auth_client.put("/api/config", json={
             "section": "crawler",
             "values": {"request_delay": 5.0},
             "persist": False,
@@ -32,16 +42,16 @@ class TestHealthAndConfig:
         assert resp.status_code == 200
         assert resp.json()["persisted"] is False
 
-    def test_config_put_invalid_section(self, client):
-        resp = client.put("/api/config", json={
+    def test_config_put_invalid_section(self, auth_client):
+        resp = auth_client.put("/api/config", json={
             "section": "nonexistent",
             "values": {},
             "persist": False,
         })
         assert resp.status_code == 400
 
-    def test_config_put_invalid_field(self, client):
-        resp = client.put("/api/config", json={
+    def test_config_put_invalid_field(self, auth_client):
+        resp = auth_client.put("/api/config", json={
             "section": "crawler",
             "values": {"nonexistent_field": 123},
             "persist": False,
@@ -113,11 +123,34 @@ class TestErrorHandling:
         resp = client.get("/api/nonexistent")
         assert resp.status_code == 404
 
-    def test_app_error_response_format(self, client):
-        resp = client.put("/api/config", json={
+    def test_app_error_response_format(self, auth_client):
+        resp = auth_client.put("/api/config", json={
             "section": "nonexistent",
             "values": {},
         })
         assert resp.status_code == 400
         data = resp.json()
         assert "detail" in data
+
+
+class TestAdminAuth:
+    def test_post_without_key_returns_401(self, client):
+        """Any POST endpoint without X-API-Key returns 401."""
+        resp = client.post("/api/tasks/nonexistent/run")
+        assert resp.status_code == 401
+        assert "Unauthorized" in resp.json()["detail"]
+
+    def test_post_with_wrong_key_returns_401(self, auth_client):
+        """Wrong key returns 401."""
+        auth_client.headers["X-API-Key"] = "wrong-key-here"
+        resp = auth_client.post("/api/tasks/nonexistent/run")
+        assert resp.status_code == 401
+
+    def test_get_endpoints_unaffected(self, client):
+        """GET endpoints are not protected."""
+        resp = client.get("/api/config")
+        assert resp.status_code == 200
+        resp = client.get("/api/crawler")
+        assert resp.status_code == 200
+        resp = client.get("/api/tasks")
+        assert resp.status_code == 200
