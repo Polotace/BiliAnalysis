@@ -7,9 +7,19 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 </script>
 
 <template>
-  <el-segmented
-    :model-value="modelValue"
-    :options="options.map(o => ({ label: o.label, value: o.key }))"
-    @update:model-value="emit('update:modelValue', $event as string)"
-  />
+  <div class="flex gap-2 flex-wrap">
+    <button
+      v-for="opt in options"
+      :key="opt.key"
+      @click="emit('update:modelValue', opt.key)"
+      class="px-4 py-1.5 border border-border rounded-[20px] text-[0.8125rem] font-medium
+             transition-colors duration-150 cursor-pointer
+             hover:border-blue hover:text-blue"
+      :class="modelValue === opt.key
+        ? 'bg-blue text-white border-blue hover:text-white'
+        : 'bg-card text-text-secondary'"
+    >
+      {{ opt.label }}
+    </button>
+  </div>
 </template>
