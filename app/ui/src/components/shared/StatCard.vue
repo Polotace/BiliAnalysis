@@ -14,9 +14,17 @@ function fmt(v: string | number): string {
 </script>
 
 <template>
-  <div class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)]">
-    <p class="text-sm font-medium text-text-secondary mb-2">{{ label }}</p>
-    <p class="text-[2rem] font-bold text-text tabular leading-tight">{{ fmt(value) }}</p>
+  <el-card shadow="never" :body-style="{ padding: '24px' }">
+    <el-statistic
+      :title="label"
+      :value="fmt(value)"
+      :value-style="{
+        color: 'var(--color-text)',
+        fontWeight: 700,
+        fontSize: '2rem',
+        fontVariantNumeric: 'tabular-nums',
+      }"
+    />
     <p v-if="subLabel" class="text-xs text-text-secondary mt-1">{{ subLabel }}</p>
-  </div>
+  </el-card>
 </template>
