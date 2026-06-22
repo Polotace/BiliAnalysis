@@ -19,6 +19,35 @@
   --shadow-hover: 0 4px 16px rgba(0, 0, 0, 0.08);
 }
 
+/* ── Element Plus Theme Mapping ── */
+:root {
+  --el-color-primary: var(--color-blue);
+  --el-color-primary-light-3: #33BEF0;
+  --el-color-primary-light-5: #66CEF4;
+  --el-color-primary-light-7: #99DFF7;
+  --el-color-primary-light-8: #B3E8FA;
+  --el-color-primary-light-9: #CCF0FC;
+  --el-color-primary-dark-2: #008BC0;
+
+  --el-color-success: var(--color-success);
+  --el-color-warning: var(--color-warning);
+  --el-color-danger: var(--color-danger);
+  --el-color-info: var(--color-text-secondary);
+
+  --el-bg-color: var(--color-bg);
+  --el-bg-color-overlay: var(--color-card);
+  --el-fill-color-blank: var(--color-card);
+
+  --el-text-color-primary: var(--color-text);
+  --el-text-color-regular: var(--color-text-secondary);
+
+  --el-border-color: var(--color-border);
+  --el-border-radius-base: var(--radius-default);
+  --el-border-radius-round: 20px;
+
+  --el-font-family: var(--font-family-sans);
+}
+
 /* ── Base ── */
 html {
   font-size: 16px;
