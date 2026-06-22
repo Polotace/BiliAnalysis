@@ -1,25 +1,15 @@
 <script setup lang="ts">
 defineProps<{
-  /** Optional section label shown below the scanner line, e.g. "正在计算统计数据…" */
   label?: string
 }>()
 </script>
 
 <template>
   <div class="al-root">
-    <!-- Card body placeholder -->
     <div class="al-body">
-
-      <!-- Scanner line container -->
       <div class="al-scanner-box">
-
-        <!-- The scanning beam (animation via class, not inline style) -->
         <div class="al-beam" />
-
-        <!-- Subtle grid lines behind the scanner (data-sheet feel) -->
         <div class="al-grid" />
-
-        <!-- Ghost bars (hinting at data) -->
         <div class="al-ghost-bars">
           <div class="al-bar" style="height:28px" />
           <div class="al-bar" style="height:56px" />
@@ -31,22 +21,25 @@ defineProps<{
         </div>
       </div>
 
-      <!-- Label (animation via class) -->
       <div class="al-label-row">
         <span class="al-label-text">{{ label ?? '分析中…' }}</span>
-        <!-- Dot trail (each dot gets animation via class + delay via custom prop) -->
         <div class="al-dots">
           <span class="al-dot" style="--dot-delay: 0s" />
           <span class="al-dot" style="--dot-delay: 0.25s" />
           <span class="al-dot" style="--dot-delay: 0.5s" />
         </div>
       </div>
+
+      <div class="w-full max-w-[360px] space-y-3">
+        <el-skeleton :rows="1" animated />
+        <el-skeleton :rows="1" animated />
+        <el-skeleton :rows="1" animated />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* ── Root ── */
 .al-root {
   position: relative;
   width: 100%;
@@ -57,7 +50,6 @@ defineProps<{
   user-select: none;
 }
 
-/* ── Body ── */
 .al-body {
   padding: 20px 24px;
   min-height: 200px;
@@ -68,7 +60,6 @@ defineProps<{
   gap: 20px;
 }
 
-/* ── Scanner box ── */
 .al-scanner-box {
   position: relative;
   width: 100%;
@@ -80,7 +71,6 @@ defineProps<{
   background: linear-gradient(180deg, #F0F2F5 0%, #E8EBEF 100%);
 }
 
-/* ── Scanning beam ── */
 .al-beam {
   position: absolute;
   left: 0;
@@ -100,7 +90,6 @@ defineProps<{
   animation: al-sweep 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
-/* ── Grid ── */
 .al-grid {
   position: absolute;
   inset: 0;
@@ -111,7 +100,6 @@ defineProps<{
     repeating-linear-gradient(90deg, transparent, transparent 39px, #000 39px, #000 40px);
 }
 
-/* ── Ghost bars ── */
 .al-ghost-bars {
   position: absolute;
   bottom: 16px;
@@ -130,7 +118,6 @@ defineProps<{
   background: #00AEEC;
 }
 
-/* ── Label ── */
 .al-label-row {
   display: flex;
   flex-direction: column;
@@ -146,7 +133,6 @@ defineProps<{
   animation: al-breathe 2.8s ease-in-out infinite;
 }
 
-/* ── Dots ── */
 .al-dots {
   display: flex;
   align-items: center;
@@ -164,7 +150,6 @@ defineProps<{
   animation-delay: var(--dot-delay, 0s);
 }
 
-/* ── Keyframes ── */
 @keyframes al-sweep {
   0%   { top: -2px; opacity: 0; }
   8%   { top: -2px; opacity: 1; }
