@@ -16,25 +16,28 @@ services:
       retries: 5
 
   api:
-    build: .
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-biliinsight}:${POSTGRES_PASSWORD:-biliinsight}@db:5432/${POSTGRES_DB:-biliinsight}
       BILI_CONFIG_PATH: /app/config.yaml
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
     ports:
       - "8080:8080"
     volumes:
-      - ./data:/app/data
-      - ./config.yaml:/app/config.yaml:ro
+      - ../data:/app/data
+      - ../config.yaml:/app/config.yaml:ro
 
   nginx:
     image: nginx:alpine
     ports:
       - "80:80"
     volumes:
-      - ./app/ui/dist:/usr/share/nginx/html:ro
+      - ../app/ui/dist:/usr/share/nginx/html:ro
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - api
