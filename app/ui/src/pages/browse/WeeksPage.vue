@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useWeeksList } from '@/composables/useApi'
-import { ElScrollbar } from 'element-plus'
 import PageShell from '@/components/layout/PageShell.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import WeekCard from '@/components/business/WeekCard.vue'

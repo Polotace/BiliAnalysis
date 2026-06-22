@@ -1,9 +1,11 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router'
-import 'element-plus/es/components/scrollbar/style/css'
+import ElementPlus from 'element-plus'
+import 'element-plus/dist/index.css'
 import './styles/theme.css'
 
 const app = createApp(App)
+app.use(ElementPlus)
 app.use(router)
 app.mount('#app')

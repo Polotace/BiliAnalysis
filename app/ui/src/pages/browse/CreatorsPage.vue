@@ -2,7 +2,6 @@
 import { ref, computed, onMounted } from 'vue'
 import { fetchCreators } from '@/composables/useApi'
 import { useRequest } from 'alova/client'
-import { ElScrollbar } from 'element-plus'
 import PageShell from '@/components/layout/PageShell.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import SortTabs from '@/components/business/SortTabs.vue'
