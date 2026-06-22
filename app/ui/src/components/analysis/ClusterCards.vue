@@ -7,6 +7,9 @@ defineProps<{ clusters: ClusterGroup[] }>()
 const CLUSTER_COLORS: Record<number, string> = {
   0: '#00AEEC', 1: '#22C55E', 2: '#F59E0B',
 }
+const TAG_TYPES: Record<number, '' | 'success' | 'warning'> = {
+  0: '', 1: 'success', 2: 'warning',
+}
 </script>
 
 <template>
@@ -20,7 +23,9 @@ const CLUSTER_COLORS: Record<number, string> = {
                border-t-[4px]"
         :style="{ borderTopColor: CLUSTER_COLORS[c.label] ?? '#6B7280' }"
       >
-        <p class="text-lg font-bold text-text mb-1">{{ c.tag }}</p>
+        <p class="text-lg font-bold text-text mb-1">
+          <el-tag :type="TAG_TYPES[c.label] ?? 'info'" size="small" effect="dark" class="mr-2">{{ c.tag }}</el-tag>
+        </p>
         <p class="text-sm text-text-secondary mb-4">{{ c.count }} 个视频</p>
         <div class="space-y-2 text-sm tabular">
           <div class="flex justify-between">

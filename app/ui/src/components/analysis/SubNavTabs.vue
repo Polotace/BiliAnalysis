@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import type { TabsPaneContext } from 'element-plus'
 
 const TABS = [
   { key: 'stats', label: '统计概览', path: '/analysis/stats' },
@@ -21,25 +22,30 @@ const activeKey = computed(() => {
   return 'stats'
 })
 
-function go(key: string) {
-  const tab = TABS.find(t => t.key === key)
-  if (tab) router.push(tab.path)
+function go(tab: TabsPaneContext) {
+  const key = tab.paneName as string
+  const found = TABS.find(t => t.key === key)
+  if (found) router.push(found.path)
 }
 </script>
 
 <template>
-  <div class="flex gap-2 border-b border-border pb-0 mb-8">
-    <button
+  <el-tabs
+    :model-value="activeKey"
+    @tab-click="go"
+    class="mb-8 subnav-tabs"
+  >
+    <el-tab-pane
       v-for="tab in TABS"
       :key="tab.key"
-      @click="go(tab.key)"
-      class="px-5 py-2.5 text-sm font-medium rounded-t-[8px] border-none cursor-pointer
-             transition-colors duration-200"
-      :class="activeKey === tab.key
-        ? 'bg-blue text-white'
-        : 'bg-transparent text-text-secondary hover:text-text hover:bg-border/50'"
-    >
-      {{ tab.label }}
-    </button>
-  </div>
+      :label="tab.label"
+      :name="tab.key"
+    />
+  </el-tabs>
 </template>
+
+<style scoped>
+.subnav-tabs {
+  --el-tabs-header-height: 44px;
+}
+</style>

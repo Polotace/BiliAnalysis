@@ -25,7 +25,7 @@ defineProps<{ creators: CreatorStats[] }>()
             class="border-b border-border last:border-0"
           >
             <td class="p-4">
-              <span class="text-text-secondary mr-2">{{ i + 1 }}</span>
+              <el-tag size="small" :type="i < 3 ? 'primary' : 'info'" class="mr-2">{{ i + 1 }}</el-tag>
               <span class="font-medium text-text">{{ c.name }}</span>
             </td>
             <td class="text-right p-4 tabular">{{ c.appearance_count }}</td>

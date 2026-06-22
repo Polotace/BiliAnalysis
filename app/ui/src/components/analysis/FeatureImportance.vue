@@ -16,10 +16,12 @@ const ranked = computed(() =>
     <div class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)] space-y-3">
       <div v-for="[name, score] in ranked" :key="name" class="flex items-center gap-4">
         <span class="text-sm text-text-secondary w-24 shrink-0">{{ name }}</span>
-        <div class="flex-1 h-2 bg-border rounded-full overflow-hidden">
-          <div
-            class="h-full bg-blue rounded-full transition-all duration-300"
-            :style="{ width: `${(score * 100).toFixed(0)}%` }"
+        <div class="flex-1">
+          <el-progress
+            :percentage="Number((score * 100).toFixed(1))"
+            :stroke-width="8"
+            :show-text="false"
+            color="var(--color-blue)"
           />
         </div>
         <span class="text-sm tabular font-medium text-text w-12 text-right">
