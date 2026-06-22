@@ -18,6 +18,7 @@ const ANALYSIS_LINKS: NavLink[] = [
   { to: '/analysis/clusters', label: '聚类分析', icon: 'scatter' },
   { to: '/analysis/predictions', label: '预测分析', icon: 'trend' },
   { to: '/analysis/keywords', label: '内容洞察', icon: 'cloud' },
+  { to: '/analysis/models', label: '模型对比', icon: 'experiment' },
 ]
 
 const links = computed<NavLink[]>(() => {
@@ -93,6 +94,10 @@ function isActive(link: NavLink) {
         <!-- Cloud -->
         <svg v-else-if="link.icon === 'cloud'" class="w-4 h-4 shrink-0" :class="isActive(link) ? 'text-blue' : 'text-text-secondary/50'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
           <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z"/>
+        </svg>
+        <!-- Experiment / beaker -->
+        <svg v-else-if="link.icon === 'experiment'" class="w-4 h-4 shrink-0" :class="isActive(link) ? 'text-blue' : 'text-text-secondary/50'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 0 1-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 0 1 4.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0 1 12 15a9.065 9.065 0 0 0-6.23.693L5 14.5m14.8.8 1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0 1 12 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5"/>
         </svg>
         <span>{{ link.label }}</span>
       </router-link>

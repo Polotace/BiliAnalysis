@@ -208,6 +208,8 @@ function pipelineColor(name: string): string {
           {ready:!!analysisOverview.last_stats,label:'统计报告',sub:analysisOverview.last_stats?.overall.total_videos+' 视频'},
           {ready:!!analysisOverview.last_cluster,label:'聚类报告',sub:'silhouette='+analysisOverview.last_cluster?.clusters.silhouette_score},
           {ready:!!analysisOverview.last_prediction,label:'预测报告',sub:'view R²='+analysisOverview.last_prediction?.view_predict.r2_score},
+          {ready:!!analysisOverview.last_keywords,label:'关键词报告',sub:analysisOverview.last_keywords?.global_?.keywords?.length+' 词'},
+          {ready:!!analysisOverview.last_model_comparison,label:'模型对比',sub:'best='+analysisOverview.last_model_comparison?.best_model+' R²='+analysisOverview.last_model_comparison?.models?.find((m:any)=>m.model_name===analysisOverview.last_model_comparison?.best_model)?.r2_mean},
         ]"
         :key="item.label"
         class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium"

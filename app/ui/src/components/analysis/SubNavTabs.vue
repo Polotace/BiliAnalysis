@@ -7,6 +7,7 @@ const TABS = [
   { key: 'clusters', label: '聚类分析', path: '/analysis/clusters' },
   { key: 'predict', label: '预测分析', path: '/analysis/predictions' },
   { key: 'keywords', label: '内容洞察', path: '/analysis/keywords' },
+  { key: 'models', label: '模型对比', path: '/analysis/models' },
 ] as const
 
 const router = useRouter()
@@ -14,6 +15,7 @@ const route = useRoute()
 
 const activeKey = computed(() => {
   if (route.path.includes('keywords')) return 'keywords'
+  if (route.path.includes('models')) return 'models'
   if (route.path.includes('clusters')) return 'clusters'
   if (route.path.includes('predict')) return 'predict'
   return 'stats'

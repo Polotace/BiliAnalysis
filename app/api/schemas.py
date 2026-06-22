@@ -33,6 +33,8 @@ class AnalysisOverview(BaseModel):
     last_stats: StatReport | None = None
     last_cluster: ClusterReport | None = None
     last_prediction: PredictionReport | None = None
+    last_keywords: dict | None = None
+    last_model_comparison: dict | None = None
 
 
 # ── Tasks ──

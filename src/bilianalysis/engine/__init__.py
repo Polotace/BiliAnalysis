@@ -6,6 +6,7 @@ from bilianalysis.engine.base import (
     OverallStats, CategoryStats, CreatorStats, WeeklyTrend, StatReport,
     ClusterGroup, ClusterResult, ClusterReport,
     PredictionResult, PredictionReport,
+    SingleModelResult, FeatureImportanceItem, ModelComparisonReport,
 )
 from bilianalysis.engine.pandas_engine import PandasEngine
 
@@ -32,4 +33,5 @@ __all__ = [
     "OverallStats", "CategoryStats", "CreatorStats", "WeeklyTrend", "StatReport",
     "ClusterGroup", "ClusterResult", "ClusterReport",
     "PredictionResult", "PredictionReport",
+    "SingleModelResult", "FeatureImportanceItem", "ModelComparisonReport",
 ]

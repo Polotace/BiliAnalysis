@@ -87,6 +87,7 @@ async def get_analysis_overview(config: Annotated[AppConfig, Depends(get_config)
         last_stats=_read_json(rd / "stats_report.json"),
         last_cluster=_read_json(rd / "cluster_report.json"),
         last_prediction=_read_json(rd / "prediction_report.json"),
+        last_keywords=_read_json(rd / "keywords_report.json"),
         last_model_comparison=_read_json(rd / "model_comparison_report.json"),
     )
 

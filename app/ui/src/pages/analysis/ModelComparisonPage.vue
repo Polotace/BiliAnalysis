@@ -27,13 +27,15 @@ const { data, loading, error, send } = useModelComparison()
 
 onMounted(() => send())
 
-// ── Brand-derived 5-model palette (from #00AEEC) ──
+// ── Brand-derived palette (from #00AEEC) ──
 const MODEL_COLORS: Record<string, string> = {
-  'XGBoost':           '#00AEEC', // brand blue — winner
-  'Random Forest':     '#0EA5E9', // sky — strong runner-up
-  'Decision Tree':     '#06B6D4', // cyan — mid-pack
-  'AdaBoost':          '#8B5CF6', // violet — lower performer
-  'Linear Regression': '#94A3B8', // slate — baseline
+  'XGBoost (Bayesian)': '#00AEEC', // brand blue — winner
+  'XGBoost':            '#0EA5E9', // sky
+  'LightGBM':           '#06B6D4', // cyan
+  'Random Forest':      '#55A467', // green
+  'Decision Tree':      '#DD8452', // orange
+  'AdaBoost':           '#8B5CF6', // violet
+  'Linear Regression':  '#94A3B8', // slate — baseline
 }
 
 function modelColor(name: string): string {
@@ -421,7 +423,7 @@ onUnmounted(() => {
         <StatCard
           label="特征数"
           :value="String(data.n_features)"
-          sub-label="含 One-Hot 编码分区"
+          :sub-label="`元数据 ~${data.n_features - data.n_nlp_features} + NLP ${data.n_nlp_features}`"
         />
       </div>
 
@@ -429,7 +431,7 @@ onUnmounted(() => {
       <section class="py-8">
         <SectionHeader
           title="模型对比 · 交叉验证 R²"
-          description="5 个回归模型按 R² 降序排列，hover 查看 MAE / RMSE / 训练时间明细"
+          :description="`${data.models.length} 个回归模型按 R² 降序排列，hover 查看 MAE / RMSE / 训练时间明细`"
         />
         <div class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)]">
           <div ref="r2ChartRef" class="w-full h-[420px]" />
@@ -462,10 +464,32 @@ onUnmounted(() => {
       <section class="py-8">
         <SectionHeader
           title="特征重要性 Top 15"
-          description="最优模型 ({{ data.best_model }}) 的 feature importance"
+          :description="`最优模型 (${data.best_model}) 的 feature importance`"
         />
         <div class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)]">
           <div ref="fiChartRef" class="w-full h-[420px]" />
+        </div>
+      </section>
+
+      <!-- Bayesian Optimization -->
+      <section v-if="data.bayesian_opt" class="py-8">
+        <SectionHeader
+          title="贝叶斯优化 · XGBoost 超参数搜索"
+          :description="`BayesSearchCV 30 轮迭代，最优 R² = ${data.bayesian_opt.best_score.toFixed(4)}`"
+        />
+        <div class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)]">
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div
+              v-for="(value, key) in data.bayesian_opt.best_params"
+              :key="key"
+              class="px-4 py-3 rounded-lg bg-bg border border-border/50"
+            >
+              <div class="text-[0.6875rem] text-text-secondary mb-0.5 font-mono">{{ key }}</div>
+              <div class="text-sm font-semibold tabular text-text">
+                {{ typeof value === 'number' ? value.toFixed(4) : value }}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
     </template>

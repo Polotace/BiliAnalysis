@@ -21,4 +21,9 @@ build/
 .superpowers/
 skills-lock.json
 config.yaml
-data/
+data/*
+/*.docx
+/*.pptx
+/*.mp4
+figures/
+design-demos/

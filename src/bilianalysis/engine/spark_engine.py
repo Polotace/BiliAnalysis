@@ -587,3 +587,12 @@ class SparkEngine(AnalysisEngine):
             view_predict=view_result, like_predict=like_result,
             duration_seconds=round(duration, 2),
         )
+
+    # ── model_comparison ───────────────────────────────────────
+
+    def model_comparison(self) -> "ModelComparisonReport":
+        """Spark 引擎暂不支持 sklearn 多模型对比，请使用 Pandas 引擎。"""
+        raise NotImplementedError(
+            "model_comparison 依赖 sklearn 多模型交叉验证，SparkEngine 暂不支持。"
+            "请使用 PandasEngine (analysis.engine: pandas)。"
+        )

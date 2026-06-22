@@ -109,6 +109,40 @@ class PredictionReport(BaseModel):
     duration_seconds: float
 
 
+# ── model_comparison ──
+
+class SingleModelResult(BaseModel):
+    """单个回归模型的交叉验证结果。"""
+    model_name: str
+    r2_mean: float
+    r2_std: float
+    mae_mean: float
+    mae_std: float
+    rmse_mean: float
+    rmse_std: float
+    train_time_seconds: float
+
+
+class FeatureImportanceItem(BaseModel):
+    """单个特征的重要性。"""
+    feature: str
+    importance: float
+
+
+class ModelComparisonReport(BaseModel):
+    """多模型回归对比报告 — 视频级预测。"""
+    n_samples: int
+    n_features: int
+    n_nlp_features: int = 0
+    target: str
+    models: list[SingleModelResult]
+    best_model: str
+    feature_importance: list[FeatureImportanceItem]
+    predicted_vs_actual: list[dict]
+    bayesian_opt: dict | None = None
+    duration_seconds: float
+
+
 # ── ABC ──
 
 class AnalysisEngine(ABC):
@@ -130,4 +164,9 @@ class AnalysisEngine(ABC):
     @abstractmethod
     def prediction(self) -> PredictionReport:
         """从 processed/ Parquet 读取 → 周序列 LinearRegression 预测。"""
+        ...
+
+    @abstractmethod
+    def model_comparison(self) -> ModelComparisonReport:
+        """加载 raw JSON → 特征工程 → 训练 5 个回归模型 (5-fold CV) → 模型对比报告。"""
         ...

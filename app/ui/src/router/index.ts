@@ -29,6 +29,11 @@ const router = createRouter({
       component: () => import('@/pages/analysis/KeywordsPage.vue'),
     },
     {
+      path: '/analysis/models',
+      name: 'models',
+      component: () => import('@/pages/analysis/ModelComparisonPage.vue'),
+    },
+    {
       path: '/videos',
       name: 'videos',
       component: () => import('@/pages/browse/VideoLibraryPage.vue'),

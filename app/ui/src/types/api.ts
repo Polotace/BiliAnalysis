@@ -233,6 +233,37 @@ export interface KeywordsReport {
   by_category: CategoryKeywords[]
 }
 
+// ── Model Comparison ──
+
+export interface SingleModelResult {
+  model_name: string
+  r2_mean: number
+  r2_std: number
+  mae_mean: number
+  mae_std: number
+  rmse_mean: number
+  rmse_std: number
+  train_time_seconds: number
+}
+
+export interface FeatureImportanceItem {
+  feature: string
+  importance: number
+}
+
+export interface ModelComparisonReport {
+  n_samples: number
+  n_features: number
+  n_nlp_features: number
+  target: string
+  models: SingleModelResult[]
+  best_model: string
+  feature_importance: FeatureImportanceItem[]
+  predicted_vs_actual: { actual: number; predicted: number; residual: number }[]
+  bayesian_opt: { best_score: number; best_params: Record<string, any> } | null
+  duration_seconds: number
+}
+
 // ── Admin ──
 
 export interface CrawlerStatus {
@@ -276,6 +307,8 @@ export interface AnalysisOverview {
   last_stats: Record<string, any> | null
   last_cluster: Record<string, any> | null
   last_prediction: Record<string, any> | null
+  last_keywords: Record<string, any> | null
+  last_model_comparison: Record<string, any> | null
 }
 
 export interface AppConfigData {

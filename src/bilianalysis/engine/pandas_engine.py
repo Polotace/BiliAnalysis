@@ -12,13 +12,20 @@ from sklearn.metrics import r2_score, mean_absolute_error, silhouette_score
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
+from sklearn.model_selection import KFold, cross_val_score
+from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
 import numpy as np
+
+import jieba
+import jieba.analyse
 
 from bilianalysis.config.model import DataSection
 from bilianalysis.engine.base import (
     AnalysisEngine, CleanReport, StatReport, ClusterReport, PredictionReport,
     OverallStats, CategoryStats, CreatorStats, WeeklyTrend,
     ClusterGroup, ClusterResult, PredictionResult,
+    SingleModelResult, FeatureImportanceItem, ModelComparisonReport,
 )
 
 
@@ -538,5 +545,283 @@ class PandasEngine(AnalysisEngine):
         return PredictionReport(
             view_predict=view_result,
             like_predict=like_result,
+            duration_seconds=round(duration, 2),
+        )
+
+    # ── model_comparison ───────────────────────────────────────
+
+    def model_comparison(self) -> ModelComparisonReport:
+        """加载 raw JSON → 特征工程 → 训练 5 个回归模型 (5-fold CV) → 模型对比报告。
+
+        此为视频级预测 (log(view) ~ 127 features)，与 prediction() 的周级预测不同。
+        """
+        start_time = time.monotonic()
+
+        # 1. 全量加载 raw JSON（需要 extended 字段：width/height/dynamic/rcmd_reason 等）
+        files = sorted(self._raw_dir.glob("week_*.json"),
+                       key=lambda p: int(p.stem.split("_")[1]))
+        rows = []
+        for fp in files:
+            data = json.loads(fp.read_text(encoding="utf-8"))
+            cfg = data.get("config", {})
+            for v in data.get("videos", []):
+                stat = v.get("stat", {}) or {}
+                owner = v.get("owner", {}) or {}
+                dim = v.get("dimension", {}) or {}
+                rights = v.get("rights", {}) or {}
+                rows.append({
+                    "aid": v.get("aid"),
+                    "view": stat.get("view"),
+                    "like": stat.get("like"),
+                    "coin": stat.get("coin"),
+                    "favorite": stat.get("favorite"),
+                    "share": stat.get("share"),
+                    "danmaku": stat.get("danmaku"),
+                    "reply": stat.get("reply"),
+                    "tid": v.get("tid"),
+                    "tidv2": v.get("tidv2"),
+                    "tname": v.get("tname"),
+                    "duration": v.get("duration"),
+                    "pubdate": v.get("pubdate"),
+                    "title": v.get("title", ""),
+                    "desc": v.get("desc", ""),
+                    "dynamic": v.get("dynamic", ""),
+                    "rcmd_reason": v.get("rcmd_reason"),
+                    "up_name": owner.get("name"),
+                    "mid": owner.get("mid"),
+                    "width": dim.get("width"),
+                    "height": dim.get("height"),
+                    "is_pay": int(bool((rights.get("pay") or 0))),
+                    "week_stime": cfg.get("stime"),
+                })
+        df = pd.DataFrame(rows)
+
+        # 2. 数据清洗
+        df = df.dropna(subset=["view", "duration", "pubdate", "tid", "title", "up_name"])
+        df = df[(df["view"] > 100) & (df["duration"] > 0)]
+        v_q995 = df["view"].quantile(0.995)
+        df = df[df["view"] <= v_q995]
+        df = df.drop_duplicates(subset=["aid"], keep="last").reset_index(drop=True)
+
+        # 3. 特征工程 (14 个派生特征)
+        df["duration_log"] = np.log1p(df["duration"])
+        df["view_log"] = np.log1p(df["view"])
+        df["title_length"] = df["title"].str.len()
+        df["desc_length"] = df["desc"].fillna("").str.len()
+        df["has_dynamic"] = df["dynamic"].fillna("").astype(bool).astype(int)
+        df["has_rcmd_reason"] = df["rcmd_reason"].fillna("").astype(bool).astype(int)
+        df["rcmd_reason_length"] = df["rcmd_reason"].fillna("").str.len()
+        df["publish_time"] = pd.to_datetime(df["pubdate"], unit="s")
+        df["publish_hour"] = df["publish_time"].dt.hour
+        df["publish_weekday"] = df["publish_time"].dt.weekday
+        df["days_to_listing"] = (df["week_stime"] - df["pubdate"]) / 86400
+        df["aspect_ratio"] = df["width"] / df["height"].replace(0, np.nan)
+        df["is_verified"] = df["tidv2"].notna().astype(int)
+
+        # 3.5 NLP 文本特征 — jieba TF-IDF 关键词二值编码
+        # clean_title / jieba domain words / STOPWORDS 复用自 bilianalysis.nlp.keywords
+        from bilianalysis.nlp.keywords import clean_title, STOPWORDS
+
+        # 补充 ML 特征工程需要的常见虚词（NLP 模块的 STOPWORDS 偏通用）
+        _ml_stopwords = STOPWORDS | set(
+            "的 了 在 是 我 有 和 就 不 人 都 一 一个 上 也 很 到 说 要 去 "
+            "你 会 着 没有 看 好 自己 这 他 她 它 们 那 被 从 把 让 用 为 "
+            "吗 呢 吧 啊 哦 呀 什么 怎么 如何 为什么 这个 那个 这些 那些 "
+            "第 期 万 亿 个 次 元".split())
+
+        def _extract_top_keywords(texts: list[str], topk: int = 30) -> list[str]:
+            combined = " ".join(t for t in texts if t)
+            if not combined.strip():
+                return []
+            tags = jieba.analyse.extract_tags(combined, topK=topk * 2, withWeight=True)
+            return [w for w, _ in tags if w not in _ml_stopwords and len(w) >= 2][:topk]
+
+        # 标题关键词
+        title_series = df["title"].apply(clean_title)
+        title_list = title_series.tolist()
+        title_top_kw = _extract_top_keywords(title_list, topk=30)
+        nlp_title_features = pd.DataFrame(index=df.index)
+        for kw in title_top_kw:
+            nlp_title_features[f"title_kw_{kw}"] = (
+                title_series.str.contains(kw, na=False).astype(int))
+
+        # 推荐理由关键词
+        rcmd_series = df["rcmd_reason"].fillna("").apply(clean_title)
+        rcmd_list = rcmd_series.tolist()
+        rcmd_top_kw = _extract_top_keywords(rcmd_list, topk=15)
+        nlp_rcmd_features = pd.DataFrame(index=df.index)
+        for kw in rcmd_top_kw:
+            nlp_rcmd_features[f"rcmd_kw_{kw}"] = (
+                rcmd_series.str.contains(kw, na=False).astype(int))
+
+        n_nlp = len(nlp_title_features.columns) + len(nlp_rcmd_features.columns)
+
+        # 4. 构建特征矩阵 (元数据 + NLP)
+        CATEGORICAL = ["tid", "publish_weekday"]
+        NUMERICAL = [
+            "duration_log", "title_length", "desc_length",
+            "days_to_listing", "publish_hour",
+            "has_dynamic", "has_rcmd_reason", "rcmd_reason_length",
+            "aspect_ratio", "is_verified", "is_pay",
+            "width", "height",
+        ]
+        feat_df = df[CATEGORICAL + NUMERICAL].copy()
+        feat_df = pd.get_dummies(feat_df, columns=CATEGORICAL, drop_first=True)
+
+        # 合并 NLP 关键词特征
+        feat_df = feat_df.join(nlp_title_features)
+        feat_df = feat_df.join(nlp_rcmd_features)
+
+        feat_df = feat_df.replace([np.inf, -np.inf], np.nan).dropna()
+
+        y = df.loc[feat_df.index, "view_log"].astype(float)
+        X = feat_df.astype(float)
+
+        n_samples = len(X)
+        n_features = X.shape[1]
+
+        # 5. 5-Fold CV 训练 6 个模型 + 贝叶斯优化
+        kf = KFold(n_splits=5, shuffle=True, random_state=42)
+        models_def: dict[str, object] = {
+            "Linear Regression": LinearRegression(),
+            "Decision Tree": DecisionTreeRegressor(max_depth=8, random_state=42),
+            "Random Forest": RandomForestRegressor(
+                n_estimators=200, max_depth=12, n_jobs=-1, random_state=42,
+            ),
+            "AdaBoost": AdaBoostRegressor(
+                n_estimators=100, learning_rate=0.5, random_state=42,
+            ),
+        }
+        # XGBoost 可选
+        try:
+            from xgboost import XGBRegressor
+            models_def["XGBoost"] = XGBRegressor(
+                n_estimators=300, max_depth=6, learning_rate=0.05,
+                n_jobs=-1, random_state=42, tree_method="hist",
+            )
+        except ImportError:
+            pass
+
+        # LightGBM 可选
+        try:
+            from lightgbm import LGBMRegressor
+            models_def["LightGBM"] = LGBMRegressor(
+                n_estimators=300, max_depth=6, learning_rate=0.05,
+                n_jobs=-1, random_state=42, verbose=-1,
+            )
+        except ImportError:
+            pass
+
+        model_results: list[SingleModelResult] = []
+        best_model = ""
+        best_r2 = -float("inf")
+        best_predictor = None
+
+        for name, model in models_def.items():
+            t0 = time.monotonic()
+            cv_mae = -cross_val_score(model, X, y, cv=kf,
+                                       scoring="neg_mean_absolute_error", n_jobs=-1)
+            cv_rmse = np.sqrt(-cross_val_score(model, X, y, cv=kf,
+                                                scoring="neg_mean_squared_error", n_jobs=-1))
+            cv_r2 = cross_val_score(model, X, y, cv=kf, scoring="r2", n_jobs=-1)
+            model.fit(X, y)
+            train_time = time.monotonic() - t0
+
+            r2_mean = float(cv_r2.mean())
+            model_results.append(SingleModelResult(
+                model_name=name,
+                r2_mean=round(r2_mean, 4),
+                r2_std=round(float(cv_r2.std()), 4),
+                mae_mean=round(float(cv_mae.mean()), 4),
+                mae_std=round(float(cv_mae.std()), 4),
+                rmse_mean=round(float(cv_rmse.mean()), 4),
+                rmse_std=round(float(cv_rmse.std()), 4),
+                train_time_seconds=round(train_time, 2),
+            ))
+            if r2_mean > best_r2:
+                best_r2 = r2_mean
+                best_model = name
+                best_predictor = model
+
+        # 5.5 贝叶斯优化 XGBoost 超参数
+        bayesian_opt_result: dict | None = None
+        try:
+            from skopt import BayesSearchCV
+            from xgboost import XGBRegressor as XGBR
+            param_space: dict = {
+                "max_depth": (3, 10),
+                "learning_rate": (0.01, 0.3, "log-uniform"),
+                "n_estimators": (100, 500),
+                "subsample": (0.6, 1.0),
+                "colsample_bytree": (0.6, 1.0),
+                "min_child_weight": (1, 10),
+            }
+            bayes_opt = BayesSearchCV(
+                XGBR(tree_method="hist", n_jobs=-1, random_state=42),
+                param_space, cv=kf, scoring="r2", n_iter=30,
+                random_state=42, n_jobs=-1,
+            )
+            t_bo = time.monotonic()
+            bayes_opt.fit(X, y)
+            bo_time = time.monotonic() - t_bo
+            bo_xgb = bayes_opt.best_estimator_
+            cv_mae_bo = -cross_val_score(bo_xgb, X, y, cv=kf,
+                                          scoring="neg_mean_absolute_error", n_jobs=-1)
+            cv_rmse_bo = np.sqrt(-cross_val_score(bo_xgb, X, y, cv=kf,
+                                                   scoring="neg_mean_squared_error", n_jobs=-1))
+            cv_r2_bo = cross_val_score(bo_xgb, X, y, cv=kf, scoring="r2", n_jobs=-1)
+
+            bo_r2 = float(cv_r2_bo.mean())
+            model_results.append(SingleModelResult(
+                model_name="XGBoost (Bayesian)",
+                r2_mean=round(bo_r2, 4),
+                r2_std=round(float(cv_r2_bo.std()), 4),
+                mae_mean=round(float(cv_mae_bo.mean()), 4),
+                mae_std=round(float(cv_mae_bo.std()), 4),
+                rmse_mean=round(float(cv_rmse_bo.mean()), 4),
+                rmse_std=round(float(cv_rmse_bo.std()), 4),
+                train_time_seconds=round(float(bo_time), 2),
+            ))
+            if bo_r2 > best_r2:
+                best_r2 = bo_r2
+                best_model = "XGBoost (Bayesian)"
+                best_predictor = bo_xgb
+
+            bayesian_opt_result = {
+                "best_score": round(float(bayes_opt.best_score_), 4),
+                "best_params": {str(k): v for k, v in bayes_opt.best_params_.items()},
+            }
+        except ImportError:
+            pass
+
+        # 6. 特征重要性 (Top 15，来自最优模型)
+        importance_items: list[FeatureImportanceItem] = []
+        if best_predictor is not None and hasattr(best_predictor, "feature_importances_"):
+            imp_series = pd.Series(best_predictor.feature_importances_, index=X.columns)
+            top15 = imp_series.nlargest(15)
+            importance_items = [
+                FeatureImportanceItem(feature=str(k), importance=round(float(v), 6))
+                for k, v in top15.items()
+            ]
+
+        # 7. 预测 vs 实际数据 (所有样本，供前端散点图 + 残差直方图)
+        y_pred = best_predictor.predict(X)
+        predicted_vs_actual: list[dict] = [
+            {
+                "actual": round(float(y.iloc[i]), 4),
+                "predicted": round(float(y_pred[i]), 4),
+                "residual": round(float(y.iloc[i] - y_pred[i]), 4),
+            }
+            for i in range(len(y))
+        ]
+
+        duration = time.monotonic() - start_time
+        return ModelComparisonReport(
+            n_samples=n_samples, n_features=n_features,
+            n_nlp_features=n_nlp,
+            target="log(view)", models=model_results, best_model=best_model,
+            feature_importance=importance_items,
+            predicted_vs_actual=predicted_vs_actual,
+            bayesian_opt=bayesian_opt_result,
             duration_seconds=round(duration, 2),
         )
