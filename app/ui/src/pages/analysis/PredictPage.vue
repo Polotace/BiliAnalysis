@@ -28,18 +28,12 @@ function fmtR2(v: number): string {
       <AnalysisLoading label="正在训练预测模型…" />
     </template>
 
-    <div v-else-if="error" class="py-12 text-center">
-      <div class="bg-card rounded-[16px] p-12 shadow-[var(--shadow-default)] max-w-md mx-auto">
-        <p class="text-lg font-semibold text-text mb-2">加载失败，请重试</p>
-        <p class="text-sm text-text-secondary mb-6">{{ (error as Error).message }}</p>
-        <button
-          @click="send()"
-          class="px-6 py-2 bg-blue text-white rounded-[12px] font-medium
-                 border-none cursor-pointer hover:bg-[#0099D6] transition-colors"
-        >
-          重试
-        </button>
-      </div>
+    <div v-else-if="error" class="py-12">
+      <el-result icon="error" title="加载失败" :sub-title="(error as Error).message">
+        <template #extra>
+          <el-button type="primary" @click="send()">重试</el-button>
+        </template>
+      </el-result>
     </div>
 
     <template v-else-if="data">
@@ -84,8 +78,8 @@ function fmtR2(v: number): string {
       </section>
     </template>
 
-    <div v-else class="py-12 text-center">
-      <p class="text-text-secondary">暂无数据，请先触发一次数据采集与分析</p>
+    <div v-else class="py-12">
+      <el-empty description="暂无数据，请先触发一次数据采集与分析" :image-size="120" />
     </div>
   </PageShell>
 </template>

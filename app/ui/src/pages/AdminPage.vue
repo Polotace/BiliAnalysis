@@ -154,32 +154,29 @@ function pipelineColor(name: string): string {
       <template v-if="apiKeySaved">
         <span class="text-sm text-[#166534] font-medium">已配置</span>
         <span class="inline-block w-2 h-2 rounded-full bg-[#22C55E]" />
-        <button
+        <el-button
           @click="clearApiKey"
-          class="ml-auto px-3 py-1.5 text-xs font-medium rounded-lg border-none cursor-pointer
-                 bg-white/60 text-[#991B1B] hover:bg-[#FEF2F2] transition-colors"
+          size="small"
+          plain
+          type="danger"
         >
           清除
-        </button>
+        </el-button>
       </template>
       <template v-else>
-        <input
+        <el-input
           v-model="apiKeyInput"
           type="password"
           placeholder="粘贴 API Key…"
-          class="flex-1 min-w-[200px] px-3 py-2 rounded-lg border border-[#7DD3FC] bg-white
-                 text-sm outline-none focus:ring-2 focus:ring-blue/30 transition-shadow"
           @keyup.enter="saveApiKey"
         />
-        <button
+        <el-button
           @click="saveApiKey"
+          type="primary"
           :disabled="!apiKeyInput.trim()"
-          class="px-4 py-2 rounded-lg text-sm font-semibold border-none cursor-pointer
-                 bg-blue text-white hover:brightness-90 transition-all
-                 disabled:opacity-40 disabled:cursor-not-allowed"
         >
           保存
-        </button>
+        </el-button>
       </template>
     </div>
 

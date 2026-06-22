@@ -27,13 +27,17 @@ const COLORS = [
     </div>
 
     <div v-if="loading" class="grid grid-cols-4 gap-4 pb-8">
-      <div v-for="i in 8" :key="i" class="h-30 bg-card rounded-[12px] animate-pulse" />
+      <div v-for="i in 8" :key="i" class="h-30 bg-card rounded-[12px]">
+        <el-skeleton animated />
+      </div>
     </div>
 
-    <div v-else-if="error" class="py-24 text-center">
-      <p class="text-lg font-semibold text-text mb-2">加载失败</p>
-      <p class="text-sm text-text-secondary mb-6">{{ (error as Error).message }}</p>
-      <button @click="send()" class="px-6 py-2 bg-blue text-white rounded-[12px] font-medium hover:opacity-90">重试</button>
+    <div v-else-if="error" class="py-24">
+      <el-result icon="error" title="加载失败" :sub-title="(error as Error).message">
+        <template #extra>
+          <el-button type="primary" @click="send()">重试</el-button>
+        </template>
+      </el-result>
     </div>
 
     <div v-else-if="data" class="grid grid-cols-4 gap-4 pb-12">

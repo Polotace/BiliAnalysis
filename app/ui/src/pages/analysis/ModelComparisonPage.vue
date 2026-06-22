@@ -387,18 +387,12 @@ onUnmounted(() => {
     </template>
 
     <!-- Error -->
-    <div v-else-if="error" class="py-12 text-center">
-      <div class="bg-card rounded-[16px] p-12 shadow-[var(--shadow-default)] max-w-md mx-auto">
-        <p class="text-lg font-semibold text-text mb-2">加载失败，请重试</p>
-        <p class="text-sm text-text-secondary mb-6">{{ (error as Error).message }}</p>
-        <button
-          @click="send()"
-          class="px-6 py-2 bg-blue text-white rounded-[12px] font-medium
-                 border-none cursor-pointer hover:brightness-90 transition-all"
-        >
-          重试
-        </button>
-      </div>
+    <div v-else-if="error" class="py-12">
+      <el-result icon="error" title="加载失败" :sub-title="(error as Error).message">
+        <template #extra>
+          <el-button type="primary" @click="send()">重试</el-button>
+        </template>
+      </el-result>
     </div>
 
     <!-- Data -->
@@ -495,10 +489,8 @@ onUnmounted(() => {
     </template>
 
     <!-- Empty -->
-    <div v-else class="py-12 text-center">
-      <p class="text-text-secondary">
-        暂无模型对比数据，请在管理页面触发分析流水线（包含 model_comparison 步骤）
-      </p>
+    <div v-else class="py-12">
+      <el-empty description="暂无模型对比数据，请在管理页面触发分析流水线（包含 model_comparison 步骤）" :image-size="120" />
     </div>
   </PageShell>
 </template>

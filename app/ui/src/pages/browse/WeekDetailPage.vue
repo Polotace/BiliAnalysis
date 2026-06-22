@@ -22,15 +22,16 @@ onMounted(() => send())
       </a>
     </div>
     <div v-if="loading" class="space-y-6 py-8">
-      <div class="h-48 bg-card rounded-[16px] animate-pulse" />
-      <div class="h-64 bg-card rounded-[12px] animate-pulse" />
+      <el-skeleton :rows="4" animated />
     </div>
 
-    <div v-else-if="error" class="py-24 text-center">
-      <p class="text-lg font-semibold text-text mb-2">加载失败</p>
-      <p class="text-sm text-text-secondary mb-6">{{ (error as Error).message }}</p>
-      <button @click="send()" class="px-6 py-2 bg-blue text-white rounded-[12px] font-medium hover:opacity-90">重试</button>
-      <button @click="router.back()" class="px-6 py-2 ml-3 border border-border rounded-[12px] text-text-secondary hover:text-text">返回</button>
+    <div v-else-if="error" class="py-24">
+      <el-result icon="error" title="加载失败" :sub-title="(error as Error).message">
+        <template #extra>
+          <el-button type="primary" @click="send()">重试</el-button>
+          <el-button @click="router.back()">返回</el-button>
+        </template>
+      </el-result>
     </div>
 
     <template v-else-if="data">

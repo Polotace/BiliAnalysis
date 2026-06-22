@@ -67,11 +67,13 @@ onMounted(() => loadPage())
     </div>
 
     <div v-if="loading && creators.length === 0" class="grid grid-cols-3 gap-4 pb-8">
-      <div v-for="i in 6" :key="i" class="h-20 bg-card rounded-[12px] animate-pulse" />
+      <div v-for="i in 6" :key="i" class="h-20 bg-card rounded-[12px]">
+        <el-skeleton animated />
+      </div>
     </div>
 
     <div v-else-if="!loading && creators.length === 0 && !hasMore" class="flex-1 flex items-center justify-center">
-      <p class="text-text-secondary">暂无创作者数据</p>
+      <el-empty description="暂无创作者数据" :image-size="80" />
     </div>
 
     <template v-else>
