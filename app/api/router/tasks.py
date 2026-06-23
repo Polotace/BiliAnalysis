@@ -3,7 +3,7 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Annotated
 
-from fastapi import APIRouter, Request, Depends
+from fastapi import APIRouter, Request, Depends, HTTPException
 
 from bilianalysis.config.model import AppConfig
 from bilianalysis.scheduler.models import RunRecord
@@ -19,6 +19,30 @@ from api.schemas import (
 )
 
 router = APIRouter(tags=["tasks"])
+
+
+@router.get("/run/{run_id}", response_model=RunHistoryItem)
+async def get_run(
+    run_id: str,
+    config: Annotated[AppConfig, Depends(get_config)],
+):
+    """Look up a single run record by run_id."""
+    from api.history import load_records
+    rows = load_records()
+    for row in rows:
+        if row["run_id"] == run_id:
+            return RunHistoryItem(
+                run_id=row["run_id"],
+                pipeline=row["pipeline"],
+                trigger=row.get("trigger", "manual"),
+                started_at=row.get("started_at", ""),
+                finished_at=row.get("finished_at") or None,
+                status=row.get("status", "unknown"),
+                step_count=int(row.get("step_count", 0)),
+                failed_step=row.get("failed_step") or None,
+                error=row.get("error") or None,
+            )
+    raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
 
 
 @router.get("/task")
@@ -99,6 +123,7 @@ async def all_history(
             status=row.get("status", "unknown"),
             step_count=int(row.get("step_count", 0)),
             failed_step=row.get("failed_step") or None,
+            error=row.get("error") or None,
         ))
     return items
 
@@ -110,8 +135,8 @@ async def pipeline_history(
     request: Request,
     limit: int = 50,
 ):
-    """Get execution history for a pipeline (from CSV)."""
-    if name not in config.scheduler.pipelines:
+    """Get execution history for a pipeline or single task (from CSV)."""
+    if not name.startswith("_task_") and name not in config.scheduler.pipelines:
         raise PipelineNotFound(name)
 
     from api.history import load_records
@@ -129,6 +154,7 @@ async def pipeline_history(
             status=row.get("status", "unknown"),
             step_count=int(row.get("step_count", 0)),
             failed_step=row.get("failed_step") or None,
+            error=row.get("error") or None,
         ))
         if len(items) >= limit:
             break
@@ -169,6 +195,14 @@ async def run_single_task(
         finally:
             record.finished_at = datetime.now(timezone.utc)
             save_record(record)
+            # Stop SparkSession if engine has one (may be None — lazy init)
+            if ctx.engine is not None and hasattr(ctx.engine, "_spark"):
+                spark = ctx.engine._spark
+                if spark is not None:
+                    try:
+                        spark.stop()
+                    except Exception:
+                        pass
 
     asyncio.create_task(_run())
     return TaskTriggerResponse(run_id=record.run_id, pipeline=f"_task_{name}")

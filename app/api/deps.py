@@ -46,15 +46,23 @@ def get_runner(
     return PipelineRunner(config)
 
 
+_analysis_engine: AnalysisEngine | None = None
+
+
 def get_engine(
     config: Annotated[AppConfig, Depends(get_config)],
 ) -> AnalysisEngine:
-    """Create an AnalysisEngine from the current config.
+    """Return the application-scoped AnalysisEngine singleton.
 
-    Uses the create_engine() factory to pick Pandas or Spark.
+    Created once on first call and reused for all subsequent requests.
+    PandasEngine is cheap; SparkEngine holds a single SparkSession that
+    must not be created per-request.
     """
-    from bilianalysis.engine import create_engine
-    return create_engine(config)
+    global _analysis_engine
+    if _analysis_engine is None:
+        from bilianalysis.engine import create_engine
+        _analysis_engine = create_engine(config)
+    return _analysis_engine
 
 
 def require_admin(request: Request) -> None:

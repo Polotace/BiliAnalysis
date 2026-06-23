@@ -59,6 +59,7 @@ class RunHistoryItem(BaseModel):
     status: str
     step_count: int
     failed_step: str | None = None
+    error: str | None = None
 
 
 # ── Config ──

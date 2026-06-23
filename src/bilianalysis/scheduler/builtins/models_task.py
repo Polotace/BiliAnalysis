@@ -1,4 +1,5 @@
 """模型对比 Task。"""
+import asyncio
 import time
 from pathlib import Path
 
@@ -13,7 +14,7 @@ class ModelComparisonTask(Task):
     async def run(self, ctx: TaskContext) -> TaskResult:
         start = time.monotonic()
         try:
-            report = ctx.engine.model_comparison()
+            report = await asyncio.to_thread(ctx.engine.model_comparison)
             rd = Path(ctx.config.data.reports_dir)
             rd.mkdir(parents=True, exist_ok=True)
             (rd / "model_comparison_report.json").write_text(

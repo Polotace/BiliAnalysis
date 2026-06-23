@@ -4,6 +4,8 @@ import time
 from pathlib import Path
 from datetime import datetime
 
+from bilianalysis.utils.async_utils import safe_run_async
+
 import pandas as pd
 
 
@@ -40,6 +42,33 @@ class PandasEngine(AnalysisEngine):
         self._raw_dir = Path(data_config.raw_dir)
         self._processed_dir = Path(data_config.processed_dir)
         self._reports_dir = Path(data_config.reports_dir)
+
+    # ── Lazy clean_data ──────────────────────────────────────
+
+    def _ensure_processed(self) -> None:
+        """Ensure processed Parquet data is readable; auto-trigger ``clean_data`` if not.
+
+        Tries to read ``Weekly.parquet`` — when that fails with any exception,
+        runs the full clean_data pipeline and then verifies the data became readable.
+
+        Safe to call repeatedly: a successful read returns immediately.
+        """
+        weekly_path = self._processed_dir / "Weekly.parquet"
+        try:
+            pd.read_parquet(weekly_path)
+            return
+        except Exception:
+            pass
+
+        safe_run_async(self.clean_data())
+
+        # Verify
+        try:
+            pd.read_parquet(weekly_path)
+        except Exception as exc:
+            raise RuntimeError(
+                f"clean_data completed but {weekly_path} still unreadable"
+            ) from exc
 
     # ── clean_data ───────────────────────────────────────────
 
@@ -257,6 +286,7 @@ class PandasEngine(AnalysisEngine):
 
     def statistics(self) -> StatReport:
         """从 processed/ Parquet 读取 → join → groupby 聚合 → StatReport。"""
+        self._ensure_processed()
         # 1. 读取 5 张 Parquet 表
         weekly = pd.read_parquet(self._processed_dir / "Weekly.parquet")
         video = pd.read_parquet(self._processed_dir / "Video.parquet")
@@ -374,6 +404,7 @@ class PandasEngine(AnalysisEngine):
 
     def clustering(self) -> ClusterReport:
         """从 processed/ Stat 读取 → StandardScaler → KMeans(k=3) → PCA(2D) → ClusterReport。"""
+        self._ensure_processed()
         start_time = time.monotonic()
         stat = pd.read_parquet(self._processed_dir / "VideoStat.parquet")
 
@@ -463,6 +494,7 @@ class PandasEngine(AnalysisEngine):
 
     def prediction(self) -> PredictionReport:
         """从 processed/ Parquet → 周聚合序列 → LinearRegression → PredictionReport。"""
+        self._ensure_processed()
         start_time = time.monotonic()
         video = pd.read_parquet(self._processed_dir / "Video.parquet")
         stat = pd.read_parquet(self._processed_dir / "VideoStat.parquet")

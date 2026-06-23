@@ -24,14 +24,13 @@ const alova = createAlova({
     }
   },
   responded: {
-    onSuccess: async (response) => {
-      if (!response.ok) {
-        const body = await response.json().catch(() => ({}))
-        throw new Error(
-          (body as { detail?: string }).detail ?? `HTTP ${response.status}`,
-        )
-      }
-      return response.json()
+    onSuccess: (response) => {
+      return response.json().then((data: any) => {
+        if (!response.ok) {
+          throw new Error(data?.detail ?? `HTTP ${response.status}`)
+        }
+        return data
+      })
     },
   },
 })
@@ -179,6 +178,9 @@ export function triggerTask(name: string) {
 }
 export function fetchTaskList() {
   return alova.Get<{ tasks: string[] }>('/task')
+}
+export function fetchRunStatus(runId: string) {
+  return alova.Get<RunHistoryItem>(`/run/${runId}`)
 }
 export function fetchPipelineHistory(name: string, limit: number = 20) {
   return alova.Get<RunHistoryItem[]>(`/tasks/${name}/history`, { params: { limit } })

@@ -34,16 +34,26 @@ def _read_json(path: Path) -> dict | None:
 
 
 def _check_data_ready(config: AppConfig) -> None:
-    """Raise 503 if no processed data or cached reports exist yet."""
+    """Raise 503 if no processed data or cached reports exist yet.
+
+    When ``engine=spark`` the processed Parquet lives on HDFS (not the
+    local filesystem), so we only check for a cached report.
+    """
     rd = _reports_dir(config)
-    pd = Path(config.data.processed_dir)
     has_cache = (rd / "stats_report.json").exists()
-    has_parquet = (pd / "Weekly.parquet").exists()
-    if not has_cache and not has_parquet:
-        raise HTTPException(
-            status_code=503,
-            detail="暂无数据，请先触发一次数据采集与分析",
-        )
+    if has_cache:
+        return
+
+    if config.analysis.engine != "spark":
+        # Pandas: check for local Parquet as a fallback signal
+        pd = Path(config.data.processed_dir)
+        if (pd / "Weekly.parquet").exists():
+            return
+
+    raise HTTPException(
+        status_code=503,
+        detail="暂无数据，请先触发一次数据采集与分析",
+    )
 
 
 @router.post("/analysis", status_code=202, response_model=TaskTriggerResponse)
@@ -103,7 +113,7 @@ async def get_stats(
         return StatReport(**cached)
     _check_data_ready(config)
     try:
-        return engine.statistics()
+        return await asyncio.to_thread(engine.statistics)
     except (FileNotFoundError, OSError):
         raise HTTPException(
             status_code=503,
@@ -122,7 +132,7 @@ async def get_clusters(
         return ClusterReport(**cached)
     _check_data_ready(config)
     try:
-        return engine.clustering()
+        return await asyncio.to_thread(engine.clustering)
     except (FileNotFoundError, OSError):
         raise HTTPException(
             status_code=503,
@@ -141,7 +151,7 @@ async def get_predictions(
         return PredictionReport(**cached)
     _check_data_ready(config)
     try:
-        return engine.prediction()
+        return await asyncio.to_thread(engine.prediction)
     except (FileNotFoundError, OSError):
         raise HTTPException(
             status_code=503,
@@ -177,7 +187,7 @@ async def get_model_comparison(
         return ModelComparisonReport(**cached)
     _check_data_ready(config)
     try:
-        return engine.model_comparison()
+        return await asyncio.to_thread(engine.model_comparison)
     except (FileNotFoundError, OSError):
         raise HTTPException(
             status_code=503,

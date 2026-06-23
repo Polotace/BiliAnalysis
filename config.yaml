@@ -13,7 +13,14 @@ crawler:
 
 # ── 分析引擎 ──
 analysis:
-  engine: pandas             # pandas | spark
+  engine: spark             # pandas | spark
+
+  # Spark 引擎配置（仅 engine: spark 时生效）
+  spark_remote: "sc://192.168.212.134:15002"   # Spark Connect gRPC 端点
+  webhdfs_url: "http://192.168.212.134:9870"   # WebHDFS REST API
+  #spark_ping_timeout: 10.0          # 连通检查超时秒数（0=跳过）
+  #spark_ping_retries: 3             # 最大重试次数
+  #spark_ping_retry_delay: 60.0      # 重试间隔秒数
 
 # ── 数据路径 ──
 data:

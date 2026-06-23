@@ -118,10 +118,19 @@ def run_task_cmd(
     engine = create_engine(config)
     ctx.engine = engine
 
-    console.print(f"[bold]Running task: {task}[/bold]")
-    start = time.monotonic()
-    result = asyncio.run(task_cls().run(ctx))
-    elapsed = time.monotonic() - start
+    try:
+        console.print(f"[bold]Running task: {task}[/bold]")
+        start = time.monotonic()
+        result = asyncio.run(task_cls().run(ctx))
+        elapsed = time.monotonic() - start
+    finally:
+        if hasattr(engine, "_spark"):
+            spark = engine._spark
+            if spark is not None:
+                try:
+                    spark.stop()
+                except Exception:
+                    pass
 
     if result.status == "success":
         console.print(f"[green]✔ {task} completed in {elapsed:.1f}s[/green]")

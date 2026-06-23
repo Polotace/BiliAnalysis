@@ -16,6 +16,11 @@ class CrawlerSection(BaseModel):
 class AnalysisSection(BaseModel):
     """分析引擎配置节"""
     engine: Literal["pandas", "spark"] = "pandas"
+    spark_remote: str | None = None            # Spark Connect gRPC 端点 "sc://host:15002"
+    webhdfs_url: str | None = None             # WebHDFS REST API "http://host:9870"
+    spark_ping_timeout: float = 10.0           # 启动后 Spark 连通检查超时秒数（0=跳过）
+    spark_ping_retries: int = 3               # 连通检查最大重试次数
+    spark_ping_retry_delay: float = 60.0      # 重试间隔秒数（默认 60s）
 
 
 class DataSection(BaseModel):

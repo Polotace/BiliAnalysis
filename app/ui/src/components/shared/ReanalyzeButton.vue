@@ -2,7 +2,7 @@
 import { computed, ref, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { Refresh } from '@element-plus/icons-vue'
-import { triggerTask, fetchPipelineHistory } from '@/composables/useApi'
+import { triggerTask, fetchRunStatus } from '@/composables/useApi'
 
 const emit = defineEmits<{ done: [success: boolean] }>()
 
@@ -16,27 +16,33 @@ const TASK_FOR_PATH: Record<string, string> = {
 }
 const taskName = computed(() => TASK_FOR_PATH[route.path] ?? '')
 
-const hasKey = ref(!!localStorage.getItem('admin_api_key'))
+// ── API Key state ──
+const storedKey = (): string => localStorage.getItem('admin_api_key') ?? ''
+const hasKey = ref(!!storedKey())
 const showPopover = ref(false)
 const keyInput = ref('')
 
 function togglePopover() {
   if (hasKey.value) { run(); return }
   showPopover.value = !showPopover.value
+  if (showPopover.value) keyInput.value = ''
 }
 
-function saveKey() {
+function saveKeyAndRun() {
   const v = keyInput.value.trim()
   if (!v) return
   localStorage.setItem('admin_api_key', v)
   hasKey.value = true
   keyInput.value = ''
   showPopover.value = false
+  run()
 }
 
+// ── Task execution ──
 const phase = ref<'idle' | 'running' | 'polling'>('idle')
 const pollMsg = ref('')
 const pollError = ref(false)
+let currentRunId = ''
 let pollTimer: ReturnType<typeof setInterval> | null = null
 
 async function run() {
@@ -45,41 +51,47 @@ async function run() {
   pollMsg.value = ''
   pollError.value = false
   try {
-    await triggerTask(taskName.value)
+    const r: any = await triggerTask(taskName.value)
+    currentRunId = r?.run_id ?? ''
     phase.value = 'polling'
     pollMsg.value = '分析中…'
     startPolling()
   } catch (e: any) {
-    pollMsg.value = `✗ ${e.message || e}`
+    const msg = e.message || e
+    pollMsg.value = `✗ ${msg}`
     pollError.value = true
     phase.value = 'idle'
+    // If auth error, open the popover so user can re-enter the API key
+    if (/401|403|unauthor|auth|key|token|denied/i.test(String(msg))) {
+      keyInput.value = hasKey.value ? storedKey() : ''
+      showPopover.value = true
+    }
   }
 }
 
 function startPolling() {
+  if (!currentRunId) return
   pollTimer = setInterval(async () => {
     try {
-      const history = await fetchPipelineHistory(`_task_${taskName.value}`, 1)
-      if (history && history.length > 0) {
-        const latest = history[0]
-        if (latest.status === 'success') {
-          stopPolling()
-          pollMsg.value = '✓ 完成'
-          phase.value = 'idle'
-          emit('done', true)
-          setTimeout(() => { pollMsg.value = '' }, 3000)
-        } else if (latest.status === 'failed') {
-          stopPolling()
-          pollMsg.value = '✗ 失败'
-          pollError.value = true
-          phase.value = 'idle'
-          emit('done', false)
-        }
+      const record = await fetchRunStatus(currentRunId)
+      if (!record) return
+      if (record.status === 'success') {
+        stopPolling()
+        pollMsg.value = '✓ 完成'
+        phase.value = 'idle'
+        emit('done', true)
+        setTimeout(() => { pollMsg.value = '' }, 3000)
+      } else if (record.status === 'failed') {
+        stopPolling()
+        pollMsg.value = '✗ 失败'
+        pollError.value = true
+        phase.value = 'idle'
+        emit('done', false)
       }
     } catch {
       // Network error during poll — keep trying
     }
-  }, 2000)
+  }, 5000)
 }
 
 function stopPolling() {
@@ -99,10 +111,9 @@ onUnmounted(() => stopPolling())
 
     <el-popover
       v-model:visible="showPopover"
-      placement="bottom-end"
-      :width="288"
-      trigger="click"
-      :disabled="hasKey"
+      placement="bottom-start"
+      :width="320"
+      trigger="manual"
     >
       <template #reference>
         <el-button
@@ -125,10 +136,10 @@ onUnmounted(() => stopPolling())
           v-model="keyInput"
           type="password"
           placeholder="粘贴 API Key…"
-          @keyup.enter="saveKey"
+          @keyup.enter="saveKeyAndRun"
         />
-        <el-button type="primary" :disabled="!keyInput.trim()" @click="saveKey">
-          保存
+        <el-button type="primary" :disabled="!keyInput.trim()" @click="saveKeyAndRun">
+          保存并运行
         </el-button>
       </div>
       <el-button link type="info" class="mt-2 text-xs" @click="showPopover = false">

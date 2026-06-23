@@ -1,4 +1,5 @@
 """聚类分析 Task。"""
+import asyncio
 import json
 import time
 from pathlib import Path
@@ -14,7 +15,7 @@ class ClusteringTask(Task):
     async def run(self, ctx: TaskContext) -> TaskResult:
         start = time.monotonic()
         try:
-            report = ctx.engine.clustering()
+            report = await asyncio.to_thread(ctx.engine.clustering)
             rd = Path(ctx.config.data.reports_dir)
             rd.mkdir(parents=True, exist_ok=True)
             (rd / "cluster_report.json").write_text(

@@ -1,7 +1,7 @@
 [project]
 name = "bilianalysis"
 version = "0.1.0"
-requires-python = ">=3.13"
+requires-python = ">=3.11"
 dependencies = [
     "aiohttp>=3.14.1",
     "asyncpg>=0.30.0",
@@ -19,7 +19,7 @@ dependencies = [
     "rich>=15.0.0",
     "schedule>=1.2.2",
     "scikit-learn>=1.9.0",
-    "xgboost>=3.3.0",
+    "xgboost>=2.1.4,<3.0",
     "sqlalchemy[asyncio]>=2.0.0",
     "typer>=0.26.7",
     "types-pyyaml>=6.0.12.20260518",
@@ -30,15 +30,21 @@ dependencies = [
 
 [project.optional-dependencies]
 spark = [
-    "pyspark>=4.1.2",
+    "pyspark==3.5.8",
+    "grpcio>=1.60.0",
+    "grpcio-status>=1.60.0",
+    "googleapis-common-protos>=1.63.0",
 ]
 
 [dependency-groups]
 dev = [
+    "grpcio>=1.60.0",
+    "grpcio-status>=1.60.0",
+    "googleapis-common-protos>=1.63.0",
     "httpx2>=0.4.0",
     "matplotlib>=3.11.0",
     "mypy>=2.1.0",
-    "pyspark>=4.1.2",
+    "pyspark>=3.5.8,<4.0",
     "pytest>=9.1.0",
     "pytest-asyncio>=1.4.0",
     "seaborn>=0.13.2",

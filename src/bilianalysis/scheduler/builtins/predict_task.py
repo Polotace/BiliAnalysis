@@ -1,4 +1,5 @@
 """回归预测 Task。"""
+import asyncio
 import json
 import time
 from pathlib import Path
@@ -14,7 +15,7 @@ class PredictionTask(Task):
     async def run(self, ctx: TaskContext) -> TaskResult:
         start = time.monotonic()
         try:
-            report = ctx.engine.prediction()
+            report = await asyncio.to_thread(ctx.engine.prediction)
             rd = Path(ctx.config.data.reports_dir)
             rd.mkdir(parents=True, exist_ok=True)
             (rd / "prediction_report.json").write_text(

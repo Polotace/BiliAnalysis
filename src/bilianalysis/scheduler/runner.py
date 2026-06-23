@@ -19,9 +19,8 @@ class PipelineRunner:
         """惰性创建分析引擎（Pandas 或 Spark）。"""
         if self._engine is None:
             from bilianalysis.engine import create_engine
-            return create_engine(self._config)
-        else:
-            return self._engine
+            self._engine = create_engine(self._config)
+        return self._engine
 
     async def run(self, name: str, trigger: TRIGGER_TYPE = "manual") -> RunRecord:
         """执行一条流水线。"""
@@ -71,11 +70,14 @@ class PipelineRunner:
             ))
         finally:
             record.finished_at = datetime.now(timezone.utc)
-            # 清理 Spark 引擎
+            # 清理 SparkSession（懒创建，可能尚未初始化）
             if self._engine is not None and hasattr(self._engine, "_spark"):
-                try:
-                    self._engine._spark.stop()
-                except Exception:
-                    pass
+                spark = self._engine._spark
+                if spark is not None:
+                    try:
+                        spark.stop()
+                    except Exception:
+                        pass
+                self._engine = None
 
         return record
