@@ -97,6 +97,11 @@ class PredictionResult(BaseModel):
     target: str
     r2_score: float
     mae: float
+    rmse: float = 0.0
+    test_r2_score: float | None = None
+    test_rmse: float | None = None
+    train_size: int = 0
+    test_size: int = 0
     coefficients: dict[str, float]
     intercept: float
     fitted: list[dict]

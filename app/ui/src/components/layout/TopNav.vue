@@ -2,9 +2,14 @@
 import { useRoute, useRouter } from 'vue-router'
 import { Setting } from '@element-plus/icons-vue'
 import ReanalyzeButton from '@/components/shared/ReanalyzeButton.vue'
+import { useAuthStore } from '@/stores/auth'
+import { onMounted } from 'vue'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+
+onMounted(() => auth.fetchMe())
 
 function isAnalysisActive() {
   return route.path.startsWith('/analysis')
@@ -13,8 +18,14 @@ function isBrowseActive() {
   return ['/videos', '/weeks', '/creators', '/categories'].some(p => route.path.startsWith(p))
 }
 
+const emit = defineEmits<{ 'reanalyze-done': [success: boolean] }>()
 function onReanalyzeDone(success: boolean) {
-  if (success) router.replace(route.fullPath)
+  emit('reanalyze-done', success)
+}
+
+async function doLogout() {
+  await auth.logout()
+  router.push('/login')
 }
 </script>
 
@@ -96,15 +107,20 @@ function onReanalyzeDone(success: boolean) {
           </router-link>
         </li>
       </ul>
-      <ReanalyzeButton v-if="isAnalysisActive()" class="ml-auto" @done="onReanalyzeDone" />
+      <ReanalyzeButton v-if="auth.isAdmin && isAnalysisActive()" class="ml-auto" @done="onReanalyzeDone" />
       <router-link
+        v-if="auth.isAdmin"
         to="/admin"
         class="no-underline text-text-secondary hover:text-text transition-colors"
-        :class="[{ 'ml-auto': !isAnalysisActive(), 'text-blue!': route.path === '/admin' }]"
+        :class="[{ 'ml-auto': !isAnalysisActive() || !auth.isAdmin, 'text-blue!': route.path === '/admin' }]"
         title="管理后台"
       >
         <el-icon class="!w-5 !h-5"><Setting /></el-icon>
       </router-link>
+      <router-link v-if="!auth.isLoggedIn" to="/login"
+                   class="text-sm text-text-secondary hover:text-text no-underline ml-auto">登录</router-link>
+      <a v-else @click.prevent="doLogout"
+         class="text-sm text-text-secondary hover:text-text cursor-pointer">退出</a>
     </div>
   </nav>
 </template>

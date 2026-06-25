@@ -1,4 +1,5 @@
 """数据清洗 Task。"""
+import asyncio
 import time
 
 from bilianalysis.scheduler.task import Task, TaskResult, TaskContext
@@ -12,7 +13,8 @@ class CleanDataTask(Task):
     async def run(self, ctx: TaskContext) -> TaskResult:
         start = time.monotonic()
         try:
-            report = await ctx.engine.clean_data()
+            report = await asyncio.to_thread(
+                lambda: asyncio.run(ctx.engine.clean_data()))
             return TaskResult(
                 task_name="clean_data", status="success",
                 duration_seconds=round(time.monotonic() - start, 2),

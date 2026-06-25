@@ -9,8 +9,10 @@ from bilianalysis.config.model import AppConfig
 from bilianalysis.crawler import CrawlRunner
 from bilianalysis.crawler.storage import load_progress
 from bilianalysis.scheduler.models import RunRecord
-from api.deps import get_config, require_admin
+from api.deps import get_config
+from api.auth_session import require_admin
 from api.history import save_record
+from api.router.tasks import _mark_running, _mark_done
 from api.schemas import TaskTriggerResponse, CrawlerStatus
 
 router = APIRouter(tags=["crawler"])
@@ -38,8 +40,10 @@ async def trigger_crawl(
         finally:
             record.finished_at = datetime.now(timezone.utc)
             save_record(record)
+            _mark_done(record.run_id)
 
     asyncio.create_task(_run())
+    _mark_running(record.run_id, "crawler")
     return TaskTriggerResponse(run_id=record.run_id, pipeline="crawler")
 
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { useAppStore } from '@/stores/app'
 import { useKeywords } from '@/composables/useApi'
 import PageShell from '@/components/layout/PageShell.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
@@ -9,8 +10,10 @@ import KeywordCloud from '@/components/charts/KeywordCloud.vue'
 import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
 
 const { data, loading, error, send } = useKeywords()
+const app = useAppStore()
 
 onMounted(() => send())
+watch(() => app.refreshKey, () => send())
 
 const selectedWeek = ref<number | null>(null)
 const selectedCategory = ref<string | null>(null)

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { usePredictions } from '@/composables/useApi'
+import { useAppStore } from '@/stores/app'
 import PageShell from '@/components/layout/PageShell.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import SubNavTabs from '@/components/analysis/SubNavTabs.vue'
@@ -11,8 +12,10 @@ import FitLineChart from '@/components/charts/FitLineChart.vue'
 import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
 
 const { data, loading, error, send } = usePredictions()
+const app = useAppStore()
 
 onMounted(() => send())
+watch(() => app.refreshKey, () => send())
 
 function fmtR2(v: number): string {
   return v.toFixed(3)

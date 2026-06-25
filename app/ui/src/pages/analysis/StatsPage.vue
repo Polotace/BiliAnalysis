@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch } from 'vue'
 import { useStats } from '@/composables/useApi'
+import { useAppStore } from '@/stores/app'
 import PageShell from '@/components/layout/PageShell.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import SubNavTabs from '@/components/analysis/SubNavTabs.vue'
@@ -12,8 +13,10 @@ import CreatorTable from '@/components/analysis/CreatorTable.vue'
 import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
 
 const { data, loading, error, send } = useStats()
+const app = useAppStore()
 
 onMounted(() => send())
+watch(() => app.refreshKey, () => send())
 </script>
 
 <template>

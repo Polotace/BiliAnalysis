@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRequest } from 'alova/client'
 import PageShell from '@/components/layout/PageShell.vue'
 import StatCard from '@/components/shared/StatCard.vue'
@@ -51,20 +51,20 @@ const actionResult = ref('')
 const actionError = ref('')
 
 // ── API Key ──
+import { useAuthStore } from '@/stores/auth'
+const auth = useAuthStore()
 const apiKeyInput = ref('')
-const apiKeySaved = ref(!!localStorage.getItem("admin_api_key"))
+const apiKeySaved = computed(() => !!auth.apiKey)
 
 function saveApiKey() {
   if (apiKeyInput.value.trim()) {
-    localStorage.setItem("admin_api_key", apiKeyInput.value.trim())
-    apiKeySaved.value = true
+    auth.setKey(apiKeyInput.value.trim())
     apiKeyInput.value = ''
   }
 }
 
 function clearApiKey() {
-  localStorage.removeItem("admin_api_key")
-  apiKeySaved.value = false
+  auth.clearKey()
 }
 
 // ── History ──
@@ -86,11 +86,28 @@ const PIPELINE_ICONS: Record<string, string> = {
   db_load: '🗄',
 }
 
+// ── Running tasks ──
+import { fetchRunningTasks } from '@/composables/useApi'
+
+const runningTasks = ref<{ run_id: string; pipeline: string; started_at: string }[]>([])
+let runningPoll: ReturnType<typeof setInterval> | null = null
+
+async function loadRunningTasks() {
+  try {
+    const r = await fetchRunningTasks()
+    runningTasks.value = (r as any)?.running ?? []
+  } catch { runningTasks.value = [] }
+}
+
 // ── Load on mount ──
 onMounted(async () => {
   await Promise.all([csSend(), aoSend(), plSend(), loadTaskList()])
   await loadHistory()
+  await loadRunningTasks()
+  runningPoll = setInterval(loadRunningTasks, 3000)
 })
+
+onUnmounted(() => { if (runningPoll) clearInterval(runningPoll) })
 
 async function doAction(pl: PipelineInfo) {
   actionLoading.value = pl.name
@@ -287,6 +304,19 @@ function pipelineColor(name: string): string {
           {{ pl.name }}
         </button>
       </template>
+    </div>
+
+    <!-- 运行中的任务 -->
+    <div v-if="runningTasks.length" class="mb-6">
+      <h2 class="text-base font-semibold text-text mb-2">运行中</h2>
+      <div class="bg-card rounded-[12px] shadow-[var(--shadow-default)] p-3 space-y-2">
+        <div v-for="t in runningTasks" :key="t.run_id"
+             class="flex items-center gap-3 text-sm">
+          <span class="w-2 h-2 rounded-full bg-blue animate-pulse"></span>
+          <span class="text-text font-medium">{{ t.pipeline }}</span>
+          <span class="text-text-secondary text-xs">{{ t.started_at }}</span>
+        </div>
+      </div>
     </div>
 
     <div v-if="historyLoading" class="text-text-secondary text-sm py-4">加载中…</div>

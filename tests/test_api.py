@@ -135,13 +135,12 @@ class TestErrorHandling:
 
 class TestAdminAuth:
     def test_post_without_key_returns_401(self, client):
-        """Any POST endpoint without X-API-Key returns 401."""
+        """Any POST endpoint without auth returns 401."""
         resp = client.post("/api/tasks/nonexistent/run")
         assert resp.status_code == 401
-        assert "Unauthorized" in resp.json()["detail"]
 
     def test_post_with_wrong_key_returns_401(self, auth_client):
-        """Wrong key returns 401."""
+        """Wrong API key returns 401."""
         auth_client.headers["X-API-Key"] = "wrong-key-here"
         resp = auth_client.post("/api/tasks/nonexistent/run")
         assert resp.status_code == 401

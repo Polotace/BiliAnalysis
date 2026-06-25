@@ -91,6 +91,7 @@ def create_app(config: AppConfig) -> FastAPI:
         """Startup: create DB tables, spawn Spark health check."""
         from api.deps import _get_sessionmaker
         from api.db.schema import Base
+        import api.db.user_schema  # noqa: F401 — register User table
         sm = _get_sessionmaker()
         async with sm() as session:
             async with session.bind.begin() as conn:
@@ -116,8 +117,14 @@ def create_app(config: AppConfig) -> FastAPI:
     if not api_settings.admin_api_key:
         api_settings.admin_api_key = secrets.token_urlsafe(32)
         print(f"[admin] Auto-generated API key: {api_settings.admin_api_key}")
+    if not api_settings.session_secret_key:
+        api_settings.session_secret_key = secrets.token_urlsafe(32)
 
     app = FastAPI(title="BiliAnalysis API", version="0.1.0", lifespan=_lifespan)
+
+    # Session middleware (must be before CORS)
+    from starlette.middleware.sessions import SessionMiddleware
+    app.add_middleware(SessionMiddleware, secret_key=api_settings.session_secret_key)
 
     # Runtime shared state
     app.state.config = config
@@ -130,6 +137,7 @@ def create_app(config: AppConfig) -> FastAPI:
         allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
+        allow_credentials=True,
     )
 
     # Register routes
@@ -143,6 +151,8 @@ def create_app(config: AppConfig) -> FastAPI:
     from api.router import weeks
     from api.router import db_load
     from api.router import proxy
+    from api.router import auth
+    app.include_router(auth.router, prefix="/api")
     app.include_router(categories.router, prefix="/api")
     app.include_router(crawler.router, prefix="/api")
     app.include_router(creators.router, prefix="/api")

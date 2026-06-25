@@ -8,7 +8,8 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from bilianalysis.config.model import AppConfig
 from bilianalysis.scheduler.models import RunRecord
 from bilianalysis.scheduler.runner import PipelineRunner
-from api.deps import get_config, get_runner, require_admin
+from api.deps import get_config, get_runner
+from api.auth_session import require_admin
 from api.errors import PipelineNotFound
 from api.history import save_record
 from bilianalysis.engine import create_engine
@@ -19,6 +20,17 @@ from api.schemas import (
 )
 
 router = APIRouter(tags=["tasks"])
+
+# Track currently executing tasks: run_id -> {pipeline, started_at, steps}
+_running: dict[str, dict] = {}
+
+
+def _mark_running(run_id: str, pipeline: str) -> None:
+    _running[run_id] = {"pipeline": pipeline, "started_at": datetime.now(timezone.utc).isoformat()}
+
+
+def _mark_done(run_id: str) -> None:
+    _running.pop(run_id, None)
 
 
 @router.get("/run/{run_id}", response_model=RunHistoryItem)
@@ -98,9 +110,17 @@ async def trigger_pipeline(
         finally:
             record.finished_at = datetime.now(timezone.utc)
             save_record(record)
+            _mark_done(record.run_id)
 
     asyncio.create_task(_run())
+    _mark_running(record.run_id, name)
     return TaskTriggerResponse(run_id=record.run_id, pipeline=name)
+
+
+@router.get("/tasks/running")
+async def running_tasks():
+    """List currently executing background tasks."""
+    return {"running": [{"run_id": rid, **info} for rid, info in _running.items()]}
 
 
 @router.get("/tasks/history", response_model=list[RunHistoryItem])
@@ -195,6 +215,7 @@ async def run_single_task(
         finally:
             record.finished_at = datetime.now(timezone.utc)
             save_record(record)
+            _mark_done(record.run_id)
             # Stop SparkSession if engine has one (may be None — lazy init)
             if ctx.engine is not None and hasattr(ctx.engine, "_spark"):
                 spark = ctx.engine._spark
@@ -205,4 +226,5 @@ async def run_single_task(
                         pass
 
     asyncio.create_task(_run())
+    _mark_running(record.run_id, f"_task_{name}")
     return TaskTriggerResponse(run_id=record.run_id, pipeline=f"_task_{name}")

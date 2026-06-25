@@ -5,7 +5,8 @@ import yaml
 from fastapi import APIRouter, Request, Depends, HTTPException
 
 from bilianalysis.config.model import AppConfig
-from api.deps import get_config, require_admin
+from api.deps import get_config
+from api.auth_session import require_admin
 from api.schemas import ConfigUpdateRequest
 
 router = APIRouter(tags=["config"])

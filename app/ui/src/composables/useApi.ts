@@ -18,16 +18,22 @@ const alova = createAlova({
   statesHook: vueHook,
   requestAdapter: adapterFetch(),
   beforeRequest: (method) => {
-    const key = localStorage.getItem("admin_api_key")
+    const key = localStorage.getItem('admin_api_key') ?? ''
     if (key && method.type !== 'GET') {
       method.config.headers = { ...method.config.headers, 'X-API-Key': key }
     }
   },
   responded: {
     onSuccess: (response) => {
+      const ct = response.headers.get('content-type') || ''
+      // Vite proxy error — returns HTML, not JSON
+      if (!ct.includes('application/json')) {
+        throw new Error('无法连接到后端服务，请确认服务已启动 (http://127.0.0.1:8080)')
+      }
+      // Backend JSON response (200, 404, 503, etc.)
       return response.json().then((data: any) => {
         if (!response.ok) {
-          throw new Error(data?.detail ?? `HTTP ${response.status}`)
+          throw new Error(data?.detail ?? `请求失败 (HTTP ${response.status})`)
         }
         return data
       })
@@ -178,6 +184,9 @@ export function triggerTask(name: string) {
 }
 export function fetchTaskList() {
   return alova.Get<{ tasks: string[] }>('/task')
+}
+export function fetchRunningTasks() {
+  return alova.Get<{ running: { run_id: string; pipeline: string; started_at: string }[] }>('/tasks/running')
 }
 export function fetchRunStatus(runId: string) {
   return alova.Get<RunHistoryItem>(`/run/${runId}`)

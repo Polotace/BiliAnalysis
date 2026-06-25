@@ -526,11 +526,15 @@ class PandasEngine(AnalysisEngine):
             video_count=("aid", "count"),
         ).reset_index().sort_values("week_number")
 
+        from sklearn.model_selection import train_test_split
+
         def _predict(target: str) -> PredictionResult:
             df = weekly_agg[weekly_agg["week_number"] > 0].copy()
-            if len(df) < 3:
+            if len(df) < 6:
                 return PredictionResult(
-                    model_type="linear_regression", target=target, r2_score=0.0, mae=0.0,
+                    model_type="linear_regression", target=target,
+                    r2_score=0.0, mae=0.0, rmse=0.0,
+                    train_size=0, test_size=0,
                     coefficients={}, intercept=0.0, fitted=[], forecast=[],
                 )
 
@@ -538,15 +542,31 @@ class PandasEngine(AnalysisEngine):
             X = df[feature_cols].values
             y = df[f"avg_{target}"].values
 
-            model = LinearRegression()
-            model.fit(X, y)
-            y_pred = model.predict(X)
+            # Train/test split (80/20)
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=0.2, random_state=42)
+            n_train, n_test = len(X_train), len(X_test)
 
-            r2 = r2_score(y, y_pred)
-            mae = mean_absolute_error(y, y_pred)
+            model = LinearRegression()
+            model.fit(X_train, y_train)
+
+            # Train metrics
+            y_train_pred = model.predict(X_train)
+            r2 = round(float(r2_score(y_train, y_train_pred)), 4)
+            mae = round(float(mean_absolute_error(y_train, y_train_pred)), 2)
+            rmse = round(float(np.sqrt(np.mean((y_train - y_train_pred) ** 2))), 2)
+
+            # Test metrics
+            y_test_pred = model.predict(X_test)
+            test_r2 = round(float(r2_score(y_test, y_test_pred)), 4)
+            test_rmse = round(float(np.sqrt(np.mean((y_test - y_test_pred) ** 2))), 2)
+
             coef = {feature_cols[i]: round(float(model.coef_[i]), 4) for i in range(len(feature_cols))}
             intercept = round(float(model.intercept_), 2)
 
+            # Fitted values (retrain on full data for forecast)
+            model.fit(X, y)
+            y_pred = model.predict(X)
             fitted = [
                 {"week_number": int(df.iloc[i]["week_number"]),
                  "actual": round(float(y[i]), 2),
@@ -565,7 +585,9 @@ class PandasEngine(AnalysisEngine):
 
             return PredictionResult(
                 model_type="linear_regression", target=target,
-                r2_score=round(float(r2), 4), mae=round(float(mae), 2),
+                r2_score=r2, mae=mae, rmse=rmse,
+                test_r2_score=test_r2, test_rmse=test_rmse,
+                train_size=n_train, test_size=n_test,
                 coefficients=coef, intercept=intercept,
                 fitted=fitted, forecast=forecast,
             )

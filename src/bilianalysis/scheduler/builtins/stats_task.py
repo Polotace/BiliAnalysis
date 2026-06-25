@@ -16,7 +16,6 @@ class StatisticsTask(Task):
         start = time.monotonic()
         try:
             report = await asyncio.to_thread(ctx.engine.statistics)
-            # 写出报告 JSON
             rd = Path(ctx.config.data.reports_dir)
             rd.mkdir(parents=True, exist_ok=True)
             (rd / "stats_report.json").write_text(
