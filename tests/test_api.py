@@ -15,11 +15,13 @@ def client():
 
 @pytest.fixture
 def auth_client():
-    """A TestClient with admin_api_key configured and X-API-Key header set."""
+    """A TestClient logged in as admin via session cookie."""
     config = AppConfig()
     app = create_app(config)
     client = TestClient(app)
-    client.headers["X-API-Key"] = app.state.api_settings.admin_api_key
+    # Log in via session
+    resp = client.post("/api/auth/login", json={"username": "admin", "password": "admin"})
+    assert resp.status_code == 200
     return client
 
 
@@ -139,11 +141,11 @@ class TestAdminAuth:
         resp = client.post("/api/tasks/nonexistent/run")
         assert resp.status_code == 401
 
-    def test_post_with_wrong_key_returns_401(self, auth_client):
-        """Wrong API key returns 401."""
-        auth_client.headers["X-API-Key"] = "wrong-key-here"
+    def test_admin_can_post(self, auth_client):
+        """Logged-in admin can access write endpoints."""
         resp = auth_client.post("/api/tasks/nonexistent/run")
-        assert resp.status_code == 401
+        # 404 = pipeline not found (auth passed), not 401
+        assert resp.status_code == 404
 
     def test_get_endpoints_unaffected(self, client):
         """GET endpoints are not protected."""

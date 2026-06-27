@@ -13,7 +13,7 @@ crawler:
 
 # ── 分析引擎 ──
 analysis:
-  engine: spark             # pandas | spark
+  engine: pandas             # pandas | spark
 
   # Spark 引擎配置（仅 engine: spark 时生效）
   spark_remote: "sc://192.168.121.134:15002"   # Spark Connect gRPC 端点

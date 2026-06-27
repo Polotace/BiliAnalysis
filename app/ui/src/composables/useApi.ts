@@ -2,6 +2,7 @@ import { createAlova } from 'alova'
 import adapterFetch from 'alova/fetch'
 import vueHook from 'alova/vue'
 import { useRequest } from 'alova/client'
+import { bus } from '@/utils/events'
 import type {
   StatReport, ClusterReport, PredictionReport,
   VideoSummary, VideoDetail, PaginatedVideos,
@@ -17,12 +18,6 @@ const alova = createAlova({
   baseURL: '/api',
   statesHook: vueHook,
   requestAdapter: adapterFetch(),
-  beforeRequest: (method) => {
-    const key = localStorage.getItem('admin_api_key') ?? ''
-    if (key && method.type !== 'GET') {
-      method.config.headers = { ...method.config.headers, 'X-API-Key': key }
-    }
-  },
   responded: {
     onSuccess: (response) => {
       const ct = response.headers.get('content-type') || ''
@@ -33,6 +28,11 @@ const alova = createAlova({
       // Backend JSON response (200, 404, 503, etc.)
       return response.json().then((data: any) => {
         if (!response.ok) {
+          if (response.status === 401) {
+            // Session expired or not logged in — clear auth state
+            import('@/stores/auth').then(m => m.useAuthStore().logout())
+            bus.emit('auth:logout')
+          }
           throw new Error(data?.detail ?? `请求失败 (HTTP ${response.status})`)
         }
         return data

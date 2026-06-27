@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const oldPassword = ref('')
 const newPassword = ref('')
@@ -24,7 +25,8 @@ async function doChange() {
   submitting.value = true
   try {
     await auth.changePassword(oldPassword.value, newPassword.value)
-    router.replace('/')
+    const redirect = (route.query.redirect as string) || '/'
+    router.replace(redirect)
   } catch (e: any) {
     error.value = e.message || '修改失败'
   } finally {

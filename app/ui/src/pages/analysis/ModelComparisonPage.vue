@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
-import { useAppStore } from '@/stores/app'
+import { bus } from '@/utils/events'
 import * as echarts from 'echarts/core'
 import { BarChart, ScatterChart } from 'echarts/charts'
 import {
@@ -25,10 +25,9 @@ echarts.use([
 ])
 
 const { data, loading, error, send } = useModelComparison()
-const app = useAppStore()
 
-onMounted(() => send())
-watch(() => app.refreshKey, () => send())
+onMounted(() => { send(); bus.on('app:refresh', send) })
+onUnmounted(() => bus.off('app:refresh', send))
 
 // ── Brand-derived palette (from #00AEEC) ──
 const MODEL_COLORS: Record<string, string> = {

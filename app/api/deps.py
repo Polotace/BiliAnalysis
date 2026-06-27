@@ -1,8 +1,7 @@
 """FastAPI dependency injection for config, runner, engine, and database sessions."""
-import secrets
 from typing import Annotated
 
-from fastapi import Request, Depends, HTTPException
+from fastapi import Request, Depends
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from api.config import ApiSettings
@@ -63,17 +62,3 @@ def get_engine(
         from bilianalysis.engine import create_engine
         _analysis_engine = create_engine(config)
     return _analysis_engine
-
-
-def require_admin(request: Request) -> None:
-    """Validate X-API-Key header against configured admin_api_key.
-
-    Raises 401 if the header is missing or doesn't match.
-    """
-    expected = request.app.state.api_settings.admin_api_key
-    provided = request.headers.get("X-API-Key", "")
-    if not secrets.compare_digest(provided, expected):
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized: invalid or missing API Key",
-        )

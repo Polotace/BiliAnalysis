@@ -602,6 +602,13 @@ class PandasEngine(AnalysisEngine):
             duration_seconds=round(duration, 2),
         )
 
+    # ── keywords ────────────────────────────────────────────
+
+    def keywords(self):
+        """Extract keywords from local Video.parquet via jieba TF-IDF."""
+        from bilianalysis.nlp.keywords import build_keywords_report
+        return build_keywords_report(self._processed_dir)
+
     # ── model_comparison ───────────────────────────────────────
 
     def model_comparison(self) -> ModelComparisonReport:

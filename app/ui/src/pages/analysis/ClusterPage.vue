@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useClusters } from '@/composables/useApi'
-import { useAppStore } from '@/stores/app'
+import { bus } from '@/utils/events'
 import PageShell from '@/components/layout/PageShell.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import SubNavTabs from '@/components/analysis/SubNavTabs.vue'
@@ -13,10 +13,9 @@ import ClusterScatter from '@/components/charts/ClusterScatter.vue'
 import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
 
 const { data, loading, error, send } = useClusters()
-const app = useAppStore()
 
-onMounted(() => send())
-watch(() => app.refreshKey, () => send())
+onMounted(() => { send(); bus.on('app:refresh', send) })
+onUnmounted(() => bus.off('app:refresh', send))
 </script>
 
 <template>

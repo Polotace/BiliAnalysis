@@ -50,22 +50,8 @@ const actionLoading = ref('')
 const actionResult = ref('')
 const actionError = ref('')
 
-// ── API Key ──
 import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
-const apiKeyInput = ref('')
-const apiKeySaved = computed(() => !!auth.apiKey)
-
-function saveApiKey() {
-  if (apiKeyInput.value.trim()) {
-    auth.setKey(apiKeyInput.value.trim())
-    apiKeyInput.value = ''
-  }
-}
-
-function clearApiKey() {
-  auth.clearKey()
-}
 
 // ── History ──
 const history = ref<RunHistoryItem[]>([])
@@ -159,44 +145,6 @@ function pipelineColor(name: string): string {
       <p class="text-[0.9375rem] text-text-secondary">数据采集、分析与入库管理</p>
     </div>
 
-    <!-- ── API Key 配置 ── -->
-    <div class="mb-6 p-4 rounded-[12px] border flex items-center gap-3 flex-wrap"
-         :class="apiKeySaved
-           ? 'bg-[#ECFDF5] border-[#A7F3D0]'
-           : 'bg-[#E6F7FD] border-[#7DD3FC]'">
-      <span class="text-sm font-semibold shrink-0"
-            :class="apiKeySaved ? 'text-[#166534]' : 'text-[#0369A1]'">
-        🔑 API Key
-      </span>
-      <template v-if="apiKeySaved">
-        <span class="text-sm text-[#166534] font-medium">已配置</span>
-        <span class="inline-block w-2 h-2 rounded-full bg-[#22C55E]" />
-        <el-button
-          @click="clearApiKey"
-          size="small"
-          plain
-          type="danger"
-        >
-          清除
-        </el-button>
-      </template>
-      <template v-else>
-        <el-input
-          v-model="apiKeyInput"
-          type="password"
-          placeholder="粘贴 API Key…"
-          @keyup.enter="saveApiKey"
-        />
-        <el-button
-          @click="saveApiKey"
-          type="primary"
-          :disabled="!apiKeyInput.trim()"
-        >
-          保存
-        </el-button>
-      </template>
-    </div>
-
     <!-- ── 系统状态 ── -->
     <h2 class="text-[1.0625rem] font-semibold text-text mb-4">系统状态</h2>
 
@@ -242,8 +190,7 @@ function pipelineColor(name: string): string {
           v-for="pl in pipelineList.pipelines"
           :key="pl.name"
           @click="doAction(pl)"
-          :disabled="actionLoading !== '' || !apiKeySaved"
-          :title="!apiKeySaved ? '请先配置 API Key' : ''"
+          :disabled="actionLoading !== ''"
           class="px-5 py-3 rounded-[12px] text-white font-semibold text-sm border-none cursor-pointer
                  transition-opacity duration-200 hover:opacity-85 disabled:opacity-50 text-left"
           :class="pipelineColor(pl.name)"
@@ -270,8 +217,7 @@ function pipelineColor(name: string): string {
         v-for="tname in taskNames"
         :key="tname"
         @click="doTask(tname)"
-        :disabled="actionLoading !== '' || !apiKeySaved"
-        :title="!apiKeySaved ? '请先配置 API Key' : ''"
+        :disabled="actionLoading !== ''"
         class="px-4 py-2 rounded-[12px] bg-card text-text-secondary border border-border
                text-sm font-medium cursor-pointer transition-all duration-150
                hover:border-blue hover:text-blue disabled:opacity-50"

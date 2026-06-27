@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { onMounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { usePredictions } from '@/composables/useApi'
-import { useAppStore } from '@/stores/app'
+import { bus } from '@/utils/events'
 import PageShell from '@/components/layout/PageShell.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
 import SubNavTabs from '@/components/analysis/SubNavTabs.vue'
@@ -10,16 +10,18 @@ import SectionHeader from '@/components/shared/SectionHeader.vue'
 import ForecastCards from '@/components/analysis/ForecastCards.vue'
 import FitLineChart from '@/components/charts/FitLineChart.vue'
 import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
+import type { PredictionResult } from '@/types/api'
 
 const { data, loading, error, send } = usePredictions()
-const app = useAppStore()
 
-onMounted(() => send())
-watch(() => app.refreshKey, () => send())
+onMounted(() => { send(); bus.on('app:refresh', send) })
+onUnmounted(() => bus.off('app:refresh', send))
 
-function fmtR2(v: number): string {
-  return v.toFixed(3)
-}
+const target = ref<'view' | 'like'>('view')
+const active = computed<PredictionResult>(() =>
+  target.value === 'view' ? data.value!.view_predict : data.value!.like_predict)
+
+function fmt(v: number, d = 2): string { return v.toFixed(d) }
 </script>
 
 <template>
@@ -40,33 +42,41 @@ function fmtR2(v: number): string {
     </div>
 
     <template v-else-if="data">
-      <div class="grid grid-cols-2 gap-6 mb-8">
-        <StatCard
-          label="播放量预测 R²"
-          :value="fmtR2(data.view_predict.r2_score)"
-          sub-label="系数越接近1拟合越好"
-        />
-        <StatCard
-          label="点赞量预测 R²"
-          :value="fmtR2(data.like_predict.r2_score)"
-          sub-label="系数越接近1拟合越好"
-        />
+      <!-- Target toggle -->
+      <div class="flex items-center gap-3 mb-6">
+        <span class="text-sm text-text-secondary">预测目标:</span>
+        <el-segmented v-model="target" :options="[
+          { label: '播放量', value: 'view' },
+          { label: '点赞量', value: 'like' },
+        ]" />
+      </div>
+
+      <!-- Train / Test metrics -->
+      <div class="grid grid-cols-4 gap-4 mb-8">
+        <StatCard label="训练 R²" :value="fmt(active.r2_score, 3)" sub-label="越高越好" />
+        <StatCard label="训练 RMSE" :value="fmt(active.rmse / 1e4, 1) + '万'" sub-label="均方根误差" />
+        <StatCard v-if="active.test_r2_score !== null"
+          label="测试 R²" :value="fmt(active.test_r2_score!, 3)"
+          sub-label="泛化能力" />
+        <StatCard v-if="active.test_rmse !== null"
+          label="测试 RMSE" :value="fmt(active.test_rmse! / 1e4, 1) + '万'"
+          sub-label="泛化误差" />
       </div>
 
       <section class="py-8">
         <SectionHeader title="预测拟合" description="实际值 vs 拟合值 vs 预测值" />
         <div class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)]">
-          <FitLineChart :result="data.view_predict" />
+          <FitLineChart :result="active" />
         </div>
       </section>
 
-      <ForecastCards :forecast="data.view_predict.forecast" />
+      <ForecastCards :forecast="active.forecast" />
 
       <section class="py-8">
-        <SectionHeader title="回归系数" description="各特征对播放量的影响权重" />
+        <SectionHeader title="回归系数" description="各特征的影响权重" />
         <div class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)] space-y-3">
           <div
-            v-for="[name, coef] in Object.entries(data.view_predict.coefficients)"
+            v-for="[name, coef] in Object.entries(active.coefficients)"
             :key="name"
             class="flex items-center gap-4"
           >
@@ -74,7 +84,7 @@ function fmtR2(v: number): string {
             <span class="text-sm font-medium tabular"
               :class="coef > 0 ? 'text-success' : 'text-danger'"
             >
-              {{ coef > 0 ? '+' : '' }}{{ coef.toFixed(4) }}
+              {{ coef > 0 ? '+' : '' }}{{ fmt(coef, 4) }}
             </span>
           </div>
         </div>

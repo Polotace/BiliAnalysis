@@ -141,6 +141,44 @@ def run_task_cmd(
         console.print(f"[red]✘ {task} failed: {result.error}[/red]")
 
 
+@schedule_app.command("check-raw")
+def check_raw_cmd(
+    config_path: str = typer.Option("config.yaml", "--config", "-c", help="Config file path"),
+):
+    """Compare local data/raw/ with HDFS /user/hadoop/bilibili/raw/."""
+    import json
+    config = load_config(config_path)
+    if config.analysis.engine != "spark":
+        console.print("[yellow]Not using Spark engine — skipping[/yellow]")
+        return
+
+    from bilianalysis.engine.spark_engine import SparkEngine
+    engine = SparkEngine(
+        config.data,
+        spark_remote=config.analysis.spark_remote,
+        webhdfs_url=config.analysis.webhdfs_url,
+    )
+    result = engine.check_raw_sync()
+
+    console.print(f"\n[bold]本地 files:[/bold] {len(result['local'])}")
+    if result["hdfs"] is None:
+        console.print("[red]HDFS unreachable![/red]")
+        return
+
+    console.print(f"[bold]HDFS files:[/bold] {len(result['hdfs'])}")
+    console.print(f"[bold]同步:[/bold] {len(result['in_sync'])}")
+    if result["local_only"]:
+        console.print(f"[yellow]仅在本地 ({len(result['local_only'])}):[/yellow]")
+        for f in result["local_only"]:
+            console.print(f"  {f}")
+    if result.get("hdfs_only"):
+        console.print(f"[blue]仅在 HDFS ({len(result['hdfs_only'])}):[/blue]")
+        for f in result["hdfs_only"]:
+            console.print(f"  {f}")
+    if not result["local_only"] and not result.get("hdfs_only", []):
+        console.print("[green]全部同步 ✓[/green]")
+
+
 @schedule_app.command("test")
 def test_cmd(
     pipeline: str = typer.Option(..., "--pipeline", "-p", help="Pipeline name"),

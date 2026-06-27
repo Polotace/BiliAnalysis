@@ -80,6 +80,11 @@ export interface PredictionResult {
   target: string
   r2_score: number
   mae: number
+  rmse: number
+  test_r2_score: number | null
+  test_rmse: number | null
+  train_size: number
+  test_size: number
   coefficients: Record<string, number>
   intercept: number
   fitted: { week_number: number; actual: number; predicted: number }[]

@@ -31,8 +31,10 @@ class PredictionTask(Task):
                 },
             )
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
             return TaskResult(
                 task_name="prediction", status="failed",
                 duration_seconds=round(time.monotonic() - start, 2),
-                error=str(exc),
+                error=str(exc) or repr(exc),
             )

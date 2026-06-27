@@ -18,9 +18,10 @@ function isBrowseActive() {
   return ['/videos', '/weeks', '/creators', '/categories'].some(p => route.path.startsWith(p))
 }
 
-const emit = defineEmits<{ 'reanalyze-done': [success: boolean] }>()
+import { bus } from '@/utils/events'
+
 function onReanalyzeDone(success: boolean) {
-  emit('reanalyze-done', success)
+  if (success) bus.emit('app:refresh')
 }
 
 async function doLogout() {

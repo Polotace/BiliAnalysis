@@ -60,11 +60,6 @@ export const useAuthStore = defineStore('auth', () => {
     if (user.value) user.value.must_change_password = false
   }
 
-  // API Key (backward compat)
-  const apiKey = ref(localStorage.getItem('admin_api_key') ?? '')
-  function setKey(key: string) { apiKey.value = key; localStorage.setItem('admin_api_key', key) }
-  function clearKey() { apiKey.value = ''; localStorage.removeItem('admin_api_key') }
-
   return { user, loading, isLoggedIn, isAdmin, mustChangePassword,
-           fetchMe, login, logout, changePassword, apiKey, setKey, clearKey }
+           fetchMe, login, logout, changePassword }
 })

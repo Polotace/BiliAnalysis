@@ -79,12 +79,13 @@ def create_app(config: AppConfig) -> FastAPI:
 
         # Spark is up — now check HDFS
         try:
-            result = engine.ping_hdfs()
-            logger.info("HDFS ping OK via %s (%s)", result["backend"], cfg.webhdfs_url)
-            print(f"[spark] HDFS reachable via {result['backend']} ({cfg.webhdfs_url})")
-        except ConnectionError as exc:
+            if hasattr(engine, "ping_hdfs"):
+                result = engine.ping_hdfs()
+                logger.info("HDFS ping OK via %s (%s)", result["backend"], cfg.webhdfs_url)
+                print(f"[spark] HDFS reachable via {result['backend']} ({cfg.webhdfs_url})")
+        except Exception as exc:
             logger.warning("HDFS ping failed: %s", exc)
-            print(f"[spark] WARNING: HDFS unreachable: {exc}")
+            print(f"[spark] WARNING: HDFS unreachable ({exc})")
 
     @asynccontextmanager
     async def _lifespan(app: FastAPI):
@@ -105,18 +106,18 @@ def create_app(config: AppConfig) -> FastAPI:
 
         yield
 
-        # Shutdown: cancel pending health check if still running
+        # Shutdown: cancel pending health check, retrieve exception to suppress warning
         task = getattr(app.state, "_spark_check_task", None)
         if task and not task.done():
             task.cancel()
+            try:
+                await task
+            except Exception:
+                pass
 
-    # Init API settings — auto-generate admin key if not configured
     from api.config import ApiSettings
     import secrets
     api_settings = ApiSettings()
-    if not api_settings.admin_api_key:
-        api_settings.admin_api_key = secrets.token_urlsafe(32)
-        print(f"[admin] Auto-generated API key: {api_settings.admin_api_key}")
     if not api_settings.session_secret_key:
         api_settings.session_secret_key = secrets.token_urlsafe(32)
 

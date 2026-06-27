@@ -1,11 +1,11 @@
 """关键词提取 Task。"""
+import asyncio
 import json
 import time
 from pathlib import Path
 
 from bilianalysis.scheduler.task import Task, TaskResult, TaskContext
 from bilianalysis.scheduler.registry import register
-from bilianalysis.nlp import build_keywords_report
 
 
 @register("keywords")
@@ -15,7 +15,7 @@ class KeywordsTask(Task):
     async def run(self, ctx: TaskContext) -> TaskResult:
         start = time.monotonic()
         try:
-            report = build_keywords_report(ctx.config.data.processed_dir)
+            report = await asyncio.to_thread(ctx.engine.keywords)
             rd = Path(ctx.config.data.reports_dir)
             rd.mkdir(parents=True, exist_ok=True)
             (rd / "keywords_report.json").write_text(
@@ -30,8 +30,10 @@ class KeywordsTask(Task):
                 },
             )
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
             return TaskResult(
                 task_name="keywords", status="failed",
                 duration_seconds=round(time.monotonic() - start, 2),
-                error=str(exc),
+                error=str(exc) or repr(exc),
             )

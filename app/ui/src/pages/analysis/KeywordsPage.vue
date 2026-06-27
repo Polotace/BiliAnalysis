@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { useAppStore } from '@/stores/app'
+import { ref, onMounted, onUnmounted } from 'vue'
+import { bus } from '@/utils/events'
 import { useKeywords } from '@/composables/useApi'
 import PageShell from '@/components/layout/PageShell.vue'
 import Sidebar from '@/components/layout/Sidebar.vue'
@@ -10,10 +10,9 @@ import KeywordCloud from '@/components/charts/KeywordCloud.vue'
 import AnalysisLoading from '@/components/shared/AnalysisLoading.vue'
 
 const { data, loading, error, send } = useKeywords()
-const app = useAppStore()
 
-onMounted(() => send())
-watch(() => app.refreshKey, () => send())
+onMounted(() => { send(); bus.on('app:refresh', send) })
+onUnmounted(() => bus.off('app:refresh', send))
 
 const selectedWeek = ref<number | null>(null)
 const selectedCategory = ref<string | null>(null)
@@ -48,18 +47,12 @@ const selectedCategory = ref<string | null>(null)
       <!-- Weekly Keywords -->
       <section class="py-8">
         <SectionHeader title="每周热词" description="按周报期数查看关键词" />
-        <div class="flex gap-2 flex-wrap mb-4">
-          <button
-            v-for="wk in data.by_week"
-            :key="wk.week_number"
-            @click="selectedWeek = wk.week_number"
-            class="px-3 py-1.5 border rounded-[20px] text-xs font-medium transition-colors cursor-pointer"
-            :class="selectedWeek === wk.week_number
-              ? 'bg-blue text-white border-blue'
-              : 'bg-card text-text-secondary border-border hover:border-blue hover:text-blue'"
-          >
-            第{{ wk.week_number }}期
-          </button>
+        <div class="mb-4">
+          <el-select v-model="selectedWeek" placeholder="选择一期周报" clearable filterable
+                     class="w-56!">
+            <el-option v-for="wk in data.by_week" :key="wk.week_number"
+                       :label="`第${wk.week_number}期`" :value="wk.week_number" />
+          </el-select>
         </div>
         <div v-if="selectedWeek" class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)]">
           <KeywordCloud
@@ -72,18 +65,12 @@ const selectedCategory = ref<string | null>(null)
       <!-- Category Keywords -->
       <section class="py-8">
         <SectionHeader title="分区热词" description="按内容分区查看关键词" />
-        <div class="flex gap-2 flex-wrap mb-4">
-          <button
-            v-for="cat in data.by_category"
-            :key="cat.tname"
-            @click="selectedCategory = cat.tname"
-            class="px-3 py-1.5 border rounded-[20px] text-xs font-medium transition-colors cursor-pointer"
-            :class="selectedCategory === cat.tname
-              ? 'bg-blue text-white border-blue'
-              : 'bg-card text-text-secondary border-border hover:border-blue hover:text-blue'"
-          >
-            {{ cat.tname }}
-          </button>
+        <div class="mb-4">
+          <el-select v-model="selectedCategory" placeholder="选择一个分区" clearable filterable
+                     class="!w-56">
+            <el-option v-for="cat in data.by_category" :key="cat.tname"
+                       :label="cat.tname" :value="cat.tname" />
+          </el-select>
         </div>
         <div v-if="selectedCategory" class="bg-card rounded-[12px] p-6 shadow-[var(--shadow-default)]">
           <KeywordCloud

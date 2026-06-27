@@ -10,10 +10,11 @@ from bilianalysis.config.model import DataSection
 from bilianalysis.engine.base import (
     AnalysisEngine, CleanReport, StatReport, ClusterReport, PredictionReport,
 )
+from bilianalysis.nlp.keywords import KeywordsReport
 from bilianalysis.engine.spark._helpers import HDFS_RAW, HDFS_PROCESSED
 from bilianalysis.engine.spark.clean import clean_data_impl
 from bilianalysis.engine.spark.analysis import (
-    compute_statistics, compute_clustering, compute_prediction,
+    compute_statistics, compute_clustering, compute_prediction, compute_keywords,
 )
 
 
@@ -123,26 +124,104 @@ class SparkEngine(AnalysisEngine):
         uploaded = 0
         for f in local_files:
             if f.name not in hdfs_files:
-                client.upload(str(f), f"{self.HDFS_RAW}/{f.name}", overwrite=True)
+                client.upload(f"{self.HDFS_RAW}", str(f), overwrite=True)
                 uploaded += 1
         return uploaded
 
-    # ── Lazy clean_data ──────────────────────────────────────
+    # ── Raw file sync check ──────────────────────────────────
 
-    def _ensure_processed(self) -> None:
-        """Probe HDFS for ``Weekly`` parquet with correct schema; auto-trigger clean_data if missing or stale."""
+    def check_raw_sync(self) -> dict:
+        """Compare local ``data/raw/`` with HDFS ``/user/hadoop/bilibili/raw/``.
+
+        Returns ``{local_only, hdfs_only, in_sync}`` lists of filenames.
+        WebHDFS unreachable → returns ``None`` for hdfs files.
+        """
+        local_files = sorted([f.name for f in self._raw_dir.glob("week_*.json")])
+        hdfs_files = None
+        try:
+            from hdfs import InsecureClient
+            client = InsecureClient(self._webhdfs_url, user="hadoop")
+            hdfs_files = sorted([
+                fname for fname in client.list(self.HDFS_RAW)
+                if fname.startswith("week_") and fname.endswith(".json")
+            ])
+        except Exception:
+            pass
+
+        if hdfs_files is None:
+            return {"local": local_files, "hdfs": None, "local_only": local_files, "in_sync": []}
+
+        local_set = set(local_files)
+        hdfs_set = set(hdfs_files)
+        return {
+            "local": local_files,
+            "hdfs": hdfs_files,
+            "local_only": sorted(local_set - hdfs_set),
+            "hdfs_only": sorted(hdfs_set - local_set),
+            "in_sync": sorted(local_set & hdfs_set),
+        }
+
+    # ── Pre-flight check ─────────────────────────────────────
+
+    def _ensure_ready(self) -> None:
+        """Verify raw + processed data are available; fix if possible.
+
+        1. Check local ``data/raw/week_*.json`` exist
+        2. Sync missing files to HDFS (upload)
+        3. Check HDFS processed Parquet (schema + existence)
+        4. Auto-trigger ``clean_data`` if needed
+        """
+        # 1. Raw files must exist locally
+        raw_files = sorted(self._raw_dir.glob("week_*.json"))
+        if not raw_files:
+            raise RuntimeError(
+                f"No week_*.json files found in {self._raw_dir}. "
+                f"Run the crawler first."
+            )
+        print(f"[spark] Found {len(raw_files)} raw week file(s) locally")
+
+        # 2. Sync raw to HDFS (upload missing). If upload fails, verify via Spark.
+        synced = 0
+        try:
+            synced = self._sync_raw_to_hdfs()
+            if synced > 0:
+                print(f"[spark] Uploaded {synced} missing raw file(s) to HDFS {self.HDFS_RAW}/")
+        except Exception as exc:
+            import traceback
+            print(f"[spark] WARNING: WebHDFS sync failed ({exc})")
+            traceback.print_exc()
+            # Verify raw files are actually accessible via Spark
+            try:
+                test_count = self._get_spark().read \
+                    .option("multiline", "true") \
+                    .json(f"{self.HDFS_RAW}/week_*.json") \
+                    .count()
+                if test_count == 0:
+                    raise RuntimeError("Spark read returned 0 rows")
+                print(f"[spark] HDFS raw data verified via Spark ({test_count} weeks)")
+            except Exception as vexc:
+                raise RuntimeError(
+                    f"WebHDFS upload failed and no raw data found on HDFS. "
+                    f"Fix WebHDFS connectivity ({self._webhdfs_url}) and retry. "
+                    f"Upload error: {exc}"
+                ) from vexc
+
+        # 3. Check processed Parquet (schema + existence)
         weekly_path = f"{self.HDFS_PROCESSED}/Weekly"
         try:
             df = self._get_spark().read.parquet(weekly_path)
-            # Schema check: new code requires `week_number` column on Video table
             video_path = f"{self.HDFS_PROCESSED}/Video"
             video = self._get_spark().read.parquet(video_path)
             if "week_number" not in video.columns:
                 raise RuntimeError("Video parquet missing week_number — schema outdated")
             df.take(1)
+            print(f"[spark] Processed data ready ({self.HDFS_PROCESSED}/)")
             return
         except Exception:
             pass
+
+        # 4. Missing or outdated — run clean_data
+        print(f"[spark] Processed data missing or outdated, running clean_data …")
         safe_run_async(self.clean_data())
         try:
             self._get_spark().read.parquet(weekly_path).take(1)
@@ -154,25 +233,27 @@ class SparkEngine(AnalysisEngine):
     # ── AnalysisEngine interface ─────────────────────────────
 
     async def clean_data(self) -> CleanReport:
-        synced = self._sync_raw_to_hdfs()
-        if synced > 0:
-            print(f"[spark] Synced {synced} raw file(s) to HDFS {self.HDFS_RAW}/")
         raw_files = sorted(self._raw_dir.glob("week_*.json"))
-        raw_paths = [str(p) for p in raw_files]
+        raw_paths = [f"{self.HDFS_RAW}/week_*.json"] if raw_files else []
+        total_weeks = len(raw_files)
         return clean_data_impl(self._get_spark(), raw_paths,
-                               self.HDFS_PROCESSED, len(raw_files))
+                               self.HDFS_PROCESSED, total_weeks)
 
     def statistics(self) -> StatReport:
-        self._ensure_processed()
+        self._ensure_ready()
         return compute_statistics(self._get_spark(), self.HDFS_PROCESSED)
 
     def clustering(self) -> ClusterReport:
-        self._ensure_processed()
+        self._ensure_ready()
         return compute_clustering(self._get_spark(), self.HDFS_PROCESSED)
 
     def prediction(self) -> PredictionReport:
-        self._ensure_processed()
+        self._ensure_ready()
         return compute_prediction(self._get_spark(), self.HDFS_PROCESSED)
+
+    def keywords(self) -> "KeywordsReport":
+        self._ensure_ready()
+        return compute_keywords(self._get_spark(), self.HDFS_PROCESSED)
 
     def model_comparison(self) -> "ModelComparisonReport":
         raise NotImplementedError(

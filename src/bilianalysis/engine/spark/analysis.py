@@ -135,13 +135,9 @@ def compute_clustering(spark: SparkSession, processed_path: str) -> ClusterRepor
     predictions = model.transform(scaled)
 
     evaluator = ClusteringEvaluator(featuresCol="scaled_features",
+                                    predictionCol="label",
                                     metricName="silhouette")
     sil_score = evaluator.evaluate(predictions)
-
-    centers = model.clusterCenters()
-    import pandas as pd
-    centers_df = pd.DataFrame([c.tolist() for c in centers], columns=features)
-    importance = {f: round(float(centers_df[f].var()), 4) for f in features}
 
     labeled = predictions.select("aid", "label").join(stat, "aid", "inner")
     cluster_agg = labeled.groupBy("label").agg(
@@ -149,6 +145,15 @@ def compute_clustering(spark: SparkSession, processed_path: str) -> ClusterRepor
         avg("view").alias("avg_view"), avg("like").alias("avg_like"),
         avg("coin").alias("avg_coin"), avg("favorite").alias("avg_favorite"),
     ).collect()
+
+    # Feature importance from cluster centers (variance across 3 clusters)
+    def _var(vals):
+        m = sum(vals) / len(vals)
+        return sum((v - m) ** 2 for v in vals) / len(vals)
+    importance = {}
+    for f in features:
+        vals = [float(r[f"avg_{f}"]) for r in cluster_agg]
+        importance[f] = round(_var(vals), 4)
 
     label_view_rank = {row["label"]: float(row["avg_view"])
                        for row in cluster_agg}
@@ -177,7 +182,7 @@ def compute_clustering(spark: SparkSession, processed_path: str) -> ClusterRepor
             sample_ids=sample_ids,
         ))
 
-    pca = PCA(k=2, seed=42, inputCol="scaled_features", outputCol="pca_features")
+    pca = PCA(k=2, inputCol="scaled_features", outputCol="pca_features")
     pca_model = pca.fit(scaled)
     pca_result = pca_model.transform(scaled)
     pca_rows = pca_result.select("pca_features").collect()
@@ -298,4 +303,49 @@ def compute_prediction(spark: SparkSession, processed_path: str) -> PredictionRe
     return PredictionReport(
         view_predict=view_result, like_predict=like_result,
         duration_seconds=round(duration, 2),
+    )
+
+
+def compute_keywords(spark: SparkSession, processed_path: str):
+    """HDFS Parquet → jieba TF-IDF → KeywordsReport (collects titles to driver)."""
+    from bilianalysis.nlp.keywords import (
+        KeywordsReport, GlobalKeywords, WeeklyKeywords, CategoryKeywords, KeywordItem,
+        clean_title, extract_keywords,
+    )
+
+    video = spark.read.parquet(f"{processed_path}/Video")
+    category = spark.read.parquet(f"{processed_path}/Category")
+
+    # Join video + category, collect titles to driver (small data)
+    df = video.join(category.select("row_id", col("tname")), "row_id", "left") \
+              .select("title", "tname", "week_number") \
+              .toPandas()
+
+    df["clean_title"] = df["title"].apply(clean_title)
+
+    # Global
+    global_items = extract_keywords(list(df["clean_title"].dropna()), topk=50)
+
+    # By week
+    by_week = []
+    for wn, group in df.groupby("week_number")["clean_title"]:
+        titles = group.dropna()
+        items = extract_keywords(list(titles), topk=10)
+        by_week.append(WeeklyKeywords(week_number=int(wn), keywords=items))
+    by_week.sort(key=lambda x: x.week_number)
+
+    # By category
+    by_category = []
+    for tname, group in df.groupby("tname"):
+        if not tname or not str(tname):
+            continue
+        titles = group["clean_title"].dropna()
+        items = extract_keywords(list(titles), topk=10)
+        by_category.append(CategoryKeywords(tname=str(tname), keywords=items))
+    by_category.sort(key=lambda x: -sum(k.weight for k in x.keywords))
+
+    return KeywordsReport(
+        global_=GlobalKeywords(keywords=global_items),
+        by_week=by_week,
+        by_category=by_category,
     )

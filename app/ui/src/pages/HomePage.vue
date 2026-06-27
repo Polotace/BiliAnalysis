@@ -15,6 +15,7 @@ onMounted(() => send())
 
 <template>
   <PageShell>
+
     <HeroSection />
 
     <template v-if="loading">

@@ -91,15 +91,24 @@ def build_keywords_report(processed_dir: str | Path) -> KeywordsReport:
     # ── Global ──
     global_items = extract_keywords(df["clean_title"].dropna().tolist(), topk=50)
 
-    # ── By week (from dwd_fact_video if available, otherwise empty)
+    # ── By week ──
     by_week: list[WeeklyKeywords] = []
     try:
-        dwd = pd.read_parquet(pp / "dwd_fact_video.parquet")
-        for wn, group in dwd.groupby("weekly_number")["title"]:
-            cleaned = group.dropna().apply(clean_title).tolist()
-            items = extract_keywords(cleaned, topk=10)
-            by_week.append(WeeklyKeywords(week_number=int(wn), keywords=items))
-        by_week.sort(key=lambda x: x.week_number)
+        source_df = None
+        source_col = None
+        # Prefer dwd_fact_video (has weekly_number); fall back to Video.parquet (has week_number)
+        if (pp / "dwd_fact_video.parquet").exists():
+            source_df = pd.read_parquet(pp / "dwd_fact_video.parquet")
+            source_col = "weekly_number"
+        elif (pp / "Video.parquet").exists():
+            source_df = pd.read_parquet(pp / "Video.parquet")
+            source_col = "week_number"
+        if source_df is not None:
+            for wn, group in source_df.groupby(source_col)["title"]:
+                cleaned = group.dropna().apply(clean_title).tolist()
+                items = extract_keywords(cleaned, topk=10)
+                by_week.append(WeeklyKeywords(week_number=int(wn), keywords=items))
+            by_week.sort(key=lambda x: x.week_number)
     except Exception:
         pass
 

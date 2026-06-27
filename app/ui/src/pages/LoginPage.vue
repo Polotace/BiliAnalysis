@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const auth = useAuthStore()
 const username = ref('')
 const password = ref('')
@@ -16,8 +17,9 @@ async function doLogin() {
   try {
     const r = await auth.login(username.value, password.value)
     await auth.fetchMe()
-    if (r.must_change_password) router.replace('/change-password')
-    else router.replace('/')
+    const redirect = (route.query.redirect as string) || '/'
+    if (r.must_change_password) router.replace(`/change-password?redirect=${encodeURIComponent(redirect)}`)
+    else router.replace(redirect)
   } catch (e: any) {
     error.value = e.message || '登录失败'
   } finally {

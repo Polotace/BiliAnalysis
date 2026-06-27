@@ -1,5 +1,4 @@
 """Analysis endpoints: /api/analysis and sub-routes."""
-import asyncio
 import json
 from pathlib import Path
 from typing import Annotated
@@ -9,12 +8,11 @@ from fastapi import APIRouter, Request, Depends, HTTPException
 from bilianalysis.config.model import AppConfig
 from bilianalysis.nlp import KeywordsReport as NLPKeywordsReport
 from bilianalysis.engine.base import (
-    AnalysisEngine, StatReport, ClusterReport, PredictionReport,
-    ModelComparisonReport,
+    StatReport, ClusterReport, PredictionReport, ModelComparisonReport,
 )
 from bilianalysis.scheduler.models import RunRecord
 from bilianalysis.scheduler.runner import PipelineRunner
-from api.deps import get_config, get_runner, get_engine
+from api.deps import get_config, get_runner
 from api.auth_session import require_admin
 from api.history import save_record
 from api.router.tasks import _mark_running, _mark_done
@@ -107,60 +105,30 @@ async def get_analysis_overview(config: Annotated[AppConfig, Depends(get_config)
 
 
 @router.get("/analysis/stats", response_model=StatReport)
-async def get_stats(
-    config: Annotated[AppConfig, Depends(get_config)],
-    engine: Annotated[AnalysisEngine, Depends(get_engine)],
-):
-    """Get statistics report. Reads from reports/ if available, falls back to engine."""
+async def get_stats(config: Annotated[AppConfig, Depends(get_config)]):
+    """Get statistics report from cache."""
     cached = _read_json(_reports_dir(config) / "stats_report.json")
     if cached:
         return StatReport(**cached)
-    _check_data_ready(config)
-    try:
-        return await asyncio.to_thread(engine.statistics)
-    except (FileNotFoundError, OSError):
-        raise HTTPException(
-            status_code=503,
-            detail="暂无数据，请先触发一次数据采集与分析",
-        )
+    raise HTTPException(status_code=503, detail="暂无数据，请先触发一次数据采集与分析")
 
 
 @router.get("/analysis/clusters", response_model=ClusterReport)
-async def get_clusters(
-    config: Annotated[AppConfig, Depends(get_config)],
-    engine: Annotated[AnalysisEngine, Depends(get_engine)],
-):
-    """Get clustering report."""
+async def get_clusters(config: Annotated[AppConfig, Depends(get_config)]):
+    """Get clustering report from cache."""
     cached = _read_json(_reports_dir(config) / "cluster_report.json")
     if cached:
         return ClusterReport(**cached)
-    _check_data_ready(config)
-    try:
-        return await asyncio.to_thread(engine.clustering)
-    except (FileNotFoundError, OSError):
-        raise HTTPException(
-            status_code=503,
-            detail="暂无数据，请先触发一次数据采集与分析",
-        )
+    raise HTTPException(status_code=503, detail="暂无数据，请先触发一次数据采集与分析")
 
 
 @router.get("/analysis/predictions", response_model=PredictionReport)
-async def get_predictions(
-    config: Annotated[AppConfig, Depends(get_config)],
-    engine: Annotated[AnalysisEngine, Depends(get_engine)],
-):
-    """Get prediction report."""
+async def get_predictions(config: Annotated[AppConfig, Depends(get_config)]):
+    """Get prediction report from cache."""
     cached = _read_json(_reports_dir(config) / "prediction_report.json")
     if cached:
         return PredictionReport(**cached)
-    _check_data_ready(config)
-    try:
-        return await asyncio.to_thread(engine.prediction)
-    except (FileNotFoundError, OSError):
-        raise HTTPException(
-            status_code=503,
-            detail="暂无数据，请先触发一次数据采集与分析",
-        )
+    raise HTTPException(status_code=503, detail="暂无数据，请先触发一次数据采集与分析")
 
 
 @router.get("/analysis/keywords")
@@ -177,28 +145,9 @@ async def get_keywords(config: Annotated[AppConfig, Depends(get_config)]):
 
 
 @router.get("/analysis/models", response_model=ModelComparisonReport)
-async def get_model_comparison(
-    config: Annotated[AppConfig, Depends(get_config)],
-    engine: Annotated[AnalysisEngine, Depends(get_engine)],
-):
-    """Get model comparison report.
-
-    Reads from cached report JSON if available (sub-ms); falls back to
-    live engine computation (~60-90s for 5 models with 5-fold CV).
-    """
+async def get_model_comparison(config: Annotated[AppConfig, Depends(get_config)]):
+    """Get model comparison report from cache."""
     cached = _read_json(_reports_dir(config) / "model_comparison_report.json")
     if cached:
         return ModelComparisonReport(**cached)
-    _check_data_ready(config)
-    try:
-        return await asyncio.to_thread(engine.model_comparison)
-    except (FileNotFoundError, OSError):
-        raise HTTPException(
-            status_code=503,
-            detail="暂无数据，请先触发一次数据采集与分析",
-        )
-    except NotImplementedError:
-        raise HTTPException(
-            status_code=503,
-            detail="当前分析引擎不支持模型对比 (需要 Pandas 引擎)",
-        )
+    raise HTTPException(status_code=503, detail="模型对比报告尚未生成，请先触发 analysis 流水线 (需要 Pandas 引擎)")
